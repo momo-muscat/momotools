@@ -123,10 +123,66 @@ uv run python manage.py runserver 0.0.0.0:8001
 
 ```bash
 uv run python manage.py migrate
-```
+``
 
 ### アプリ作成
 
 ```bash
 uv run python manage.py startapp <app名>
+```
+
+# 別PCでの環境構築手順
+
+このプロジェクトはGitHub（https://github.com/momo-muscat/momotools.git）で管理しているため、別PCで編集する場合は上記「Linux環境構築手順」の3.（`uv init`や`startproject`によるDjangoプロジェクトの雛形作成）は不要。以下の手順のみでよい。
+
+### 1. WSL2(Ubuntu)の準備
+Windows側で未導入の場合は`wsl --install`等でセットアップしておく。
+
+### 2. Docker Engineのインストール
+上記「Linux環境構築手順」1.と同じ手順（`docker-ce` / `docker-compose-plugin`導入、`usermod -aG docker $USER`）を実施する。
+
+### 3. uvのインストール
+上記「Linux環境構築手順」2.と同じ。
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+### 4. リポジトリのクローン
+
+```bash
+git clone https://github.com/momo-muscat/momotools.git
+cd momotools
+```
+
+### 5. `.env`の作成
+
+`.env`は`.gitignore`対象のためリポジトリに含まれない。`.env.example`をコピーして値を環境に合わせて調整する。
+
+```bash
+cp .env.example .env
+```
+
+> `DJANGO_SECRET_KEY`は本番運用する場合、PCごと・環境ごとに固有の値へ変更することを推奨。
+
+### 6. コンテナのビルドと起動
+
+上記「Linux環境構築手順」4.と同じ。
+
+```bash
+sudo docker compose up --build -d
+sudo docker compose exec web python manage.py migrate
+sudo docker compose ps
+```
+
+`docker`グループが反映されていれば`sudo`は不要。
+
+### 7. Dev Containersでの開発
+
+VS Codeで`.devcontainer/devcontainer.json`を検出させ、「Reopen in Container」を実行する。`postCreateCommand`で`uv sync`が自動実行され、依存関係（`uv.lock`基準）が`web`コンテナ内に構築される。
+
+### 8. （任意）コード品質チェックツールの有効化
+
+```bash
+uv run pre-commit install   # git commit時に自動実行させる場合
 ```
