@@ -1,0 +1,29 @@
+[project]
+name = "momotools"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "django>=6.0.7",
+    "django-environ>=0.14.0",
+    "gunicorn>=26.0.0",
+    "psycopg[binary]>=3.3.4",
+]
+
+[dependency-groups]
+dev = [
+    "black>=26.5.1",
+    "pre-commit>=4.6.0",
+    "ruff>=0.15.21",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "DJ"]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
