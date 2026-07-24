@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BACKUP_DIR="/momo/backup"
+BACKUP_DIR="$HOME/momo/backup"
 OLD_DIR="$BACKUP_DIR/old"
 BACKUP_FILE="$BACKUP_DIR/momotools.sql.gz"
 RETENTION_DAYS=90
