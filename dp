@@ -1,0 +1,10 @@
+#!/bin/bash
+# 本番デプロイ（マイグレーション無し）: VPS上の ~/momotools で実行する
+set -euo pipefail
+cd "$(dirname "$(readlink -f "$0")")"
+
+git pull
+uv sync
+uv run python manage.py collectstatic --noinput
+sudo systemctl restart momotools
+sudo systemctl status momotools --no-pager
