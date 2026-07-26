@@ -17,11 +17,6 @@
 1. postgresql-client相当（psql） — `postgres:16-alpine`イメージに同梱、`docker compose exec db psql ...`で利用
 1. pre-commit + ruff/black — コード品質チェック
 
-## TODO
-- ~~上記2～6のコンポーネント以外に必須なものはあれば提案してほしい~~ 完了（上記「追加コンポーネント」参照）
-- ~~OKであればコンポーネントをDocker Engine上で動作するようインストール~~ 完了
-- ~~インストールしたときの手順（コマンド）を下記のLinux環境構築手順に記入~~ 完了
-
 ## Linux環境構築手順
 
 ### 1. Docker Engineのインストール（要sudo）
@@ -123,13 +118,14 @@ uv run python manage.py runserver 0.0.0.0:8001
 
 ```bash
 uv run python manage.py migrate
-``
+```
 
 ### アプリ作成
 
 ```bash
 uv run python manage.py startapp <app名>
 ```
+
 
 # 別PCでの環境構築手順
 
