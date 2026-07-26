@@ -22,7 +22,7 @@ VPS上にmomoToolsを本番稼働させるための構築〜初回デプロイ�
 - [x] 6. nginx + Let's Encrypt(certbot)でのリバースプロキシ/TLS設定
 - [x] 7. コンテナの起動・自動起動設定
 - [x] 8. 動作確認
-- [ ] 9. （任意）バックアップ運用
+- [x] 9. （任意）バックアップ運用
 
 ---
 
@@ -318,7 +318,59 @@ sudo chown -R momo:momo /home/momo/momotools
 
 ## 9. （任意）バックアップ運用
 
-*(未実施)*
+PostgreSQLの日次バックアップを`scripts/backup_db.sh`（リポジトリ管理）で実施する。
+
+### 仕様
+
+- バックアップ先: `~/momo/backup/momotools.sql.gz`
+- 実行前に、既存の（前日分の）バックアップを`~/momo/backup/old/momotools_YYYYMMDD.sql.gz`へ日付付きで退避（日付はファイルの更新日時から取得）
+- `~/momo/backup/old`内の90日（3ヶ月）超のバックアップは自動削除
+- `docker compose exec db pg_dump`でコンテナの環境変数（`POSTGRES_USER`/`POSTGRES_DB`）をそのまま利用するため、認証情報をスクリプト内に重複して持たない
+
+### セットアップ
+
+```bash
+cd ~/momotools
+git pull
+chmod +x scripts/backup_db.sh
+./scripts/backup_db.sh   # 動作確認
+ls -la ~/momo/backup
+```
+
+cronに毎日0時実行として登録：
+
+```bash
+(crontab -l 2>/dev/null; echo "0 0 * * * /home/ubuntu/momotools/scripts/backup_db.sh >> /home/ubuntu/momo/backup/backup.log 2>&1") | crontab -
+crontab -l
+```
+
+結果：手動実行での動作確認、cron登録ともに完了。
+
+### 復元手順
+
+バックアップファイル（`~/momo/backup/momotools.sql.gz`、または過去分の`~/momo/backup/old/momotools_YYYYMMDD.sql.gz`）からDBを復元する場合。
+
+```bash
+cd ~/momotools
+
+# 復元したいバックアップファイルを指定
+BACKUP_FILE=~/momo/backup/momotools.sql.gz
+# 過去の日付分を戻す場合の例: BACKUP_FILE=~/momo/backup/old/momotools_20260601.sql.gz
+
+# アプリを一時停止（復元中の書き込み事故を防ぐ）
+docker compose -f docker-compose.yml -f docker-compose.prod.yml stop web
+
+# DBを空の状態に作り直す
+docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d postgres -c "DROP DATABASE IF EXISTS \"$POSTGRES_DB\";" -c "CREATE DATABASE \"$POSTGRES_DB\" OWNER \"$POSTGRES_USER\";"'
+
+# バックアップを流し込む
+gunzip -c "$BACKUP_FILE" | docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+
+# アプリを再開
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d web
+```
+
+> `DROP DATABASE`を伴うため、実行前に対象のバックアップファイルと日付を必ず確認すること。誤って本番運用中に無関係な古いバックアップを復元すると、その時点以降のデータが失われる。
 
 ---
 
