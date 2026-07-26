@@ -4,23 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-momotools is a personal-use Django project run inside Docker (Django + PostgreSQL, nginx reverse
-proxy in production). It's deployed at `https://jkmomo.net/momotools/` as one of several projects
-sharing that VPS/domain (see "Multi-project hosting" below). Written in Japanese; README.md,
+momotools is a personal-use Django project (Django + PostgreSQL, nginx reverse proxy in
+production). It's deployed at `https://jkmomo.net/momotools/` as one of several projects sharing
+that VPS/domain (see "Multi-project hosting" below). Written in Japanese; README.md,
 README_DEPLOY.md, and README_VPS.md contain the full setup/deploy/VPS history in Japanese and are
 the source of truth for anything infrastructure-related not covered here.
 
-Dependencies are managed with `uv` (not pip/poetry directly); the lockfile is `uv.lock`.
+Dependencies are managed with `uv` (not pip/poetry directly); the lockfile is `uv.lock`. There is
+no Docker/container layer — dev and prod both run directly on the host (WSL2 locally, a systemd
+service on the VPS) against a natively-installed PostgreSQL.
 
 ## Commands
 
-All commands run inside the `web` container (or via `uv run` if working directly on the host with
-`uv` installed). In the Dev Container, the `web` service already runs `runserver` as PID 1, so
-don't try to start it again on the default port.
-
 ```bash
-# Run dev server on an alternate port (PID 1 already holds 8000)
-uv run python manage.py runserver 0.0.0.0:8001
+# Run dev server
+uv run python manage.py runserver 0.0.0.0:8000
 
 # Migrations
 uv run python manage.py makemigrations
@@ -40,20 +38,14 @@ uv run black --check .
 uv run pre-commit install   # one-time, runs ruff+black on commit
 ```
 
-Outside the container (host machine, from scratch):
+Production deploy (VPS, via SSH — see README_DEPLOY.md for the full procedure):
 
 ```bash
-sudo docker compose up --build -d
-sudo docker compose exec web python manage.py migrate
-```
-
-Production uses an override compose file — always include both when starting/rebuilding in prod,
-otherwise it falls back to the dev `runserver` CMD from the Dockerfile:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-docker compose exec web python manage.py migrate
-docker compose exec web python manage.py collectstatic --noinput
+git pull
+uv sync
+uv run python manage.py migrate
+uv run python manage.py collectstatic --noinput
+sudo systemctl restart momotools
 ```
 
 ## Architecture
@@ -67,26 +59,32 @@ docker compose exec web python manage.py collectstatic --noinput
   project's URL namespace rather than assuming root-mounted routes.
 - Settings (`config/settings.py`) are environment-driven via `django-environ`, reading from `.env`
   (gitignored; copy from `.env.example`). Key env vars: `DEBUG`, `DJANGO_SECRET_KEY`,
-  `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS`, `DATABASE_URL`, plus `POSTGRES_*` for the
-  db container. `DATABASE_URL` falls back to local sqlite if unset. `LANGUAGE_CODE` is `ja`,
+  `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS`, `DATABASE_URL`. `LANGUAGE_CODE` is `ja`,
   `TIME_ZONE` is `Asia/Tokyo`.
+- **Database auth differs between local and prod on purpose.** Locally, PostgreSQL is reached over
+  a Unix socket with peer authentication — the Postgres role name must match your OS username (e.g.
+  `postgres://momo@//var/run/postgresql/momotools`), so there's no local password to manage. In
+  production, it's TCP + password (`postgres://user:pass@127.0.0.1:5432/dbname`) since the app runs
+  under a fixed service user (`ubuntu`) via systemd. `POSTGRES_DB`/`POSTGRES_USER`/
+  `POSTGRES_PASSWORD` in `.env` are only consumed by `scripts/backup_db.sh` on the VPS (TCP auth for
+  `pg_dump`), not by Django itself.
 - `SECURE_PROXY_SSL_HEADER` is set because nginx terminates TLS and proxies to Django over plain
   HTTP — Django trusts `X-Forwarded-Proto` to detect HTTPS. Don't remove this without also
   reconsidering the nginx config.
-- Dev vs prod differ only via `docker-compose.prod.yml`: prod overrides the `web` command to run
-  gunicorn (`config.wsgi:application`) instead of the Dockerfile's default `runserver`, and sets
-  `restart: always`. Both `db` and `web` ports are bound to `127.0.0.1` only in both configs —
-  external access always goes through host nginx, never directly to the containers.
+- In production, gunicorn (`config.wsgi:application`) runs as a systemd service (`momotools.service`)
+  bound to `127.0.0.1:8000`; nginx is the only thing that talks to it. Locally, `manage.py runserver`
+  is used directly — there's no process manager needed for dev.
 - Templates use Tailwind via CDN script tag (no build pipeline) — see
   `top_page/templates/top_page/index.html` for the current pattern.
-- `scripts/backup_db.sh` does daily PostgreSQL backups via `docker compose exec db pg_dump`
-  (reusing the container's own env vars, no duplicated credentials), rotating old dumps into
-  `~/momo/backup/old/` with 90-day retention; registered via cron on the VPS, not in-repo.
+- `scripts/backup_db.sh` does daily PostgreSQL backups via a direct `pg_dump` against the native
+  Postgres instance (TCP, credentials from `.env`), rotating old dumps into `~/momo/backup/old/`
+  with 90-day retention; registered via cron on the VPS, not in-repo.
 
 ## Multi-project hosting (VPS)
 
 This app is one of potentially several projects sharing one VPS/nginx/domain. The convention
-(documented in full in README_VPS.md) is: one project = one container (or static dir) on its own
-internal port bound to `127.0.0.1`, with nginx routing `location /project-name/` to it. Each new
-project gets its own Postgres database name even if sharing the same Postgres server. Don't assume
-this project can bind to a public port or own the domain root.
+(documented in full in README_VPS.md) is: one project = one process (systemd service or static
+dir) on its own internal port bound to `127.0.0.1`, with nginx routing `location /project-name/` to
+it. Each new project gets its own Postgres database (and typically its own role) even if sharing
+the same native Postgres server. Don't assume this project can bind to a public port or own the
+domain root.

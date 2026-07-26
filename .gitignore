@@ -21,3 +21,6 @@ media/
 .vscode/
 .idea/
 .DS_Store
+
+# Claude Codeセッションの作業メモ（ローカル限定、リポジトリには含めない）
+.claude-session-backups/

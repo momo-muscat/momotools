@@ -15,9 +15,12 @@ if [ -f "$BACKUP_FILE" ]; then
     mv "$BACKUP_FILE" "$OLD_DIR/momotools_${PREV_DATE}.sql.gz"
 fi
 
-# 新規バックアップ作成
+# 新規バックアップ作成（ネイティブPostgreSQLへTCP接続、.envの認証情報を利用）
 cd "$PROJECT_DIR"
-docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip > "$BACKUP_FILE"
+set -a
+source "$PROJECT_DIR/.env"
+set +a
+PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -h 127.0.0.1 -U "$POSTGRES_USER" "$POSTGRES_DB" | gzip > "$BACKUP_FILE"
 
 # 3ヶ月(90日)以上前のバックアップを削除
 find "$OLD_DIR" -name "momotools_*.sql.gz" -mtime "+${RETENTION_DAYS}" -delete

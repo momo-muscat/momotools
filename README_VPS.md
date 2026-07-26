@@ -10,19 +10,22 @@ VPS上にmomoToolsを本番稼働させるための構築〜初回デプロイ�
 - SSHユーザー: ubuntu（鍵認証、ポート22）
 - ドメイン: jkmomo.net
 - 用途: 個人利用・友人公開程度（大量同時アクセスなし）
-- 構成: Docker Compose上で `web`（Django + gunicorn）/ `db`（PostgreSQL）を稼働し、`nginx` でリバースプロキシ + TLS終端する想定
+- 構成: 当初はDocker Compose上で `web`（Django + gunicorn）/ `db`（PostgreSQL）を稼働していたが、
+  「10. Docker撤去 → ネイティブ移行」でDockerを撤去し、`uv`管理の仮想環境 + systemdサービス + ネイティブ
+  PostgreSQLの構成に移行した。`nginx`でリバースプロキシ + TLS終端する点は変更なし。
 
 ## 進捗
 
 - [x] 1. VPSの初期設定
-- [x] 2. Docker Engineのインストール
+- [x] 2. Docker Engineのインストール（→ 10.でDocker自体を撤去済み）
 - [x] 3. リポジトリのクローン
 - [x] 4. 本番用`.env`の作成
 - [x] 5. 本番向け設定の調整（DEBUG, ALLOWED_HOSTS, gunicorn化など）
 - [x] 6. nginx + Let's Encrypt(certbot)でのリバースプロキシ/TLS設定
-- [x] 7. コンテナの起動・自動起動設定
+- [x] 7. コンテナの起動・自動起動設定（→ 10.でsystemdサービスに置き換え済み）
 - [x] 8. 動作確認
-- [x] 9. （任意）バックアップ運用
+- [x] 9. （任意）バックアップ運用（→ 10.でスクリプトをネイティブpg_dumpに書き換え済み）
+- [x] 10. Docker撤去 → ネイティブ移行
 
 ---
 
@@ -469,6 +472,172 @@ location /staticsite/ {
 
 | パス | 内容 | ポート/配信元 |
 |---|---|---|
-| `/momotools/` | momotools（Django, gunicorn） | 127.0.0.1:8000（コンテナ） |
+| `/momotools/` | momotools（Django, gunicorn） | 127.0.0.1:8000（systemdサービス、旧: コンテナ） |
 
 新規プロジェクトを追加するたびに、このテーブルへ追記していく。
+
+---
+
+## 10. Docker撤去 → ネイティブ移行
+
+Docker Compose運用（コンテナのデフォルト実行ユーザーがrootだったことによる所有権破壊、
+Claude Codeのセッション状態がリビルドの度に消えるなど）で繰り返し問題が発生したため、
+`web`（gunicorn）はsystemdサービスへ、`db`（PostgreSQL）はネイティブインストールへ移行する。
+nginx・certbot・DNS（6.参照）は一切変更しない。
+
+同じポート（127.0.0.1:5432 / 127.0.0.1:8000）を使うため、新旧同時稼働ではなく「停止 → 切替」で行う。
+各ステップでDockerコンテナは`stop`のみ（`rm`しない）とし、いつでもロールバックできるようにする。
+
+### 手順
+
+**V0. 念のためのバックアップ**
+
+```bash
+docker volume ls | grep postgres_data   # 実際のvolume名を確認
+docker run --rm -v <確認したvolume名>:/data -v ~/momo/backup:/backup alpine \
+  tar czf /backup/postgres_data_pre_native_migration.tar.gz -C /data .
+```
+
+**V1. Dockerの`db`が動いている状態でダンプを取る（ネイティブPostgreSQLをインストールする前に必ず先に実施）**
+
+```bash
+cd ~/momotools
+docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' \
+  > ~/momo/backup/momotools_migration_$(date +%Y%m%d).sql
+
+# 後で照合するためのベースラインを記録
+docker compose exec -T db psql -U momotools -d momotools -c "\dt"
+docker compose exec -T db psql -U momotools -d momotools -c \
+  "SELECT (SELECT count(*) FROM auth_user) AS users, (SELECT count(*) FROM django_migrations) AS migrations;"
+```
+
+**V2. Dockerの`db`を停止（ポートを空ける。`rm`はしない）**
+
+```bash
+docker compose stop db
+```
+
+**V3. ネイティブPostgreSQLをインストールしてロール/DBを作成、復元**
+
+```bash
+sudo apt update && sudo apt install -y postgresql postgresql-contrib
+grep POSTGRES_PASSWORD .env   # 既存パスワードを確認して使い回す
+
+sudo -u postgres psql -c "CREATE ROLE momotools WITH LOGIN PASSWORD '<上で確認したパスワード>';"
+sudo -u postgres createdb momotools --owner=momotools
+
+psql -h 127.0.0.1 -U momotools -d momotools -f ~/momo/backup/momotools_migration_*.sql
+```
+
+検証（V1のベースラインと一致するか確認）:
+
+```bash
+psql -h 127.0.0.1 -U momotools -d momotools -c "\dt"
+psql -h 127.0.0.1 -U momotools -d momotools -c \
+  "SELECT (SELECT count(*) FROM auth_user) AS users, (SELECT count(*) FROM django_migrations) AS migrations;"
+```
+
+> 数が合わなければ何もせず`docker compose start db`で即座に元通りになる（新規ロールへの復元のみなので
+> 元データには触れていない）。
+
+**V4. uv環境構築 + DB疎通確認（まだ本番トラフィックには影響しない）**
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh   # 未導入なら
+cd ~/momotools
+uv sync
+
+# .envのDATABASE_URLのホストを "db" → "127.0.0.1" に変更（他の値は変更不要）
+nano .env
+
+uv run python manage.py showmigrations   # ネイティブDBに疎通できるか確認
+```
+
+**V5. 静的ファイル収集（nginxの配信パスは変わらないので設定変更不要）**
+
+```bash
+uv run python manage.py collectstatic --noinput
+```
+
+**V6. systemdユニット作成**
+
+```bash
+sudo tee /etc/systemd/system/momotools.service > /dev/null <<'EOF'
+[Unit]
+Description=momotools gunicorn daemon
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/momotools
+EnvironmentFile=/home/ubuntu/momotools/.env
+ExecStart=/home/ubuntu/momotools/.venv/bin/gunicorn config.wsgi:application --bind 127.0.0.1:8000 --workers 3
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable momotools
+```
+
+> 旧`docker-compose.prod.yml`ではDocker自身のポートマッピングで`127.0.0.1`限定にしていたため
+> gunicorn自体は`0.0.0.0:8000`にbindしていた。コンテナが無くなるため、ここでは
+> `ExecStart`で直接`127.0.0.1:8000`にbindする（`0.0.0.0`にしないこと）。
+
+**V7. 切替（ここで一瞬ダウンタイムが発生する）**
+
+```bash
+cd ~/momotools
+docker compose stop web        # rmはしない
+sudo systemctl start momotools
+sudo systemctl status momotools
+journalctl -u momotools -n 50 --no-pager
+```
+
+**V8. 動作確認**
+
+```bash
+curl -I http://127.0.0.1:8000/momotools/
+```
+
+ブラウザで`https://jkmomo.net/momotools/`と`https://jkmomo.net/momotools/admin/`を確認する。
+
+> ダメならロールバック: `sudo systemctl stop momotools && docker compose start web`
+> （V2でdbも止めていれば`docker compose start db`も）
+
+**V9. 数日様子見**
+
+Dockerコンテナは`stop`のまま残しておく。
+
+**V10. バックアップスクリプトの更新確認**
+
+```bash
+cd ~/momotools && git pull   # scripts/backup_db.shのDocker非依存版を取得
+chmod +x scripts/backup_db.sh
+./scripts/backup_db.sh
+ls -la ~/momo/backup
+```
+
+cronのコマンド自体（パス・スケジュール）は変更不要。次回0時実行が成功するのを確認してから次へ。
+
+**V11. Docker完全撤去（V9の様子見 + V10のcron成功を確認してから）**
+
+```bash
+cd ~/momotools
+docker compose down -v   # このプロジェクトのコンテナ・named volume(postgres_data等)を削除
+
+sudo systemctl disable --now docker.service docker.socket containerd.service
+sudo apt-get purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo apt-get autoremove -y --purge
+sudo rm -rf /var/lib/docker /var/lib/containerd /etc/docker /etc/apt/sources.list.d/docker.list /etc/apt/keyrings/docker.asc
+sudo groupdel docker   # 存在すれば
+```
+
+このVPSに他プロジェクトが無い（Dockerを使う予定も無い）ことを確認済みのため、Docker Engine自体を
+完全に撤去してよい。
