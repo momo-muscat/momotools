@@ -24,13 +24,14 @@ uv run python manage.py runserver 0.0.0.0:8000
 uv run python manage.py makemigrations
 uv run python manage.py migrate
 
-# Create an app
-uv run python manage.py startapp <app_name>
+# Create an app (apps live under app/, not the project root — see README.md for the full steps,
+# including the apps.py `name` and INSTALLED_APPS/urls.py fixups this requires)
+uv run python manage.py startapp <app_name> app/<app_name>
 
 # Tests (per-app tests.py, standard Django test runner)
 uv run python manage.py test
-uv run python manage.py test top_page
-uv run python manage.py test top_page.tests.SomeTestCase.test_some_method  # single test
+uv run python manage.py test app.top_page
+uv run python manage.py test app.top_page.tests.SomeTestCase.test_some_method  # single test
 
 # Lint / format
 uv run ruff check .
@@ -50,10 +51,13 @@ sudo systemctl restart momotools
 
 ## Architecture
 
-- Single Django project `config/` with one app per feature area; currently only `top_page` exists
-  (a placeholder landing page — `TemplateView` rendering `top_page/index.html`, no models yet).
+- Single Django project `config/` with one app per feature area, all living under `app/`
+  (e.g. `app/top_page/`); currently only `top_page` exists (a placeholder landing page —
+  `TemplateView` rendering `top_page/index.html`, no models yet). `INSTALLED_APPS` and imports use
+  the dotted path `app.top_page`, but the Django app label (used by `manage.py test`, migrations,
+  etc.) stays the last component, `top_page`.
 - **URL mounting is not at root.** `config/urls.py` mounts everything under `/momotools/`
-  (`momotools/admin/` for the admin site, `momotools/` for `top_page.urls`). This is deliberate:
+  (`momotools/admin/` for the admin site, `momotools/` for `app.top_page.urls`). This is deliberate:
   the VPS hosts multiple unrelated projects under one domain via nginx path-based routing, and this
   project owns the `/momotools/` path segment. When adding new apps/views, keep them under this
   project's URL namespace rather than assuming root-mounted routes.
@@ -75,7 +79,9 @@ sudo systemctl restart momotools
   bound to `127.0.0.1:8000`; nginx is the only thing that talks to it. Locally, `manage.py runserver`
   is used directly — there's no process manager needed for dev.
 - Templates use Tailwind via CDN script tag (no build pipeline) — see
-  `top_page/templates/top_page/index.html` for the current pattern.
+  `app/top_page/templates/top_page/index.html` for the current pattern. A parallel Jinja2 backend
+  is also configured (`config/jinja2.py`), rooted at the project-level `jinja2/` directory (not
+  per-app) since there's only one app so far — see README.md for details.
 - `scripts/backup_db.sh` does daily PostgreSQL backups via a direct `pg_dump` against the native
   Postgres instance (TCP, credentials from `.env`), rotating old dumps into `~/momo/backup/old/`
   with 90-day retention; registered via cron on the VPS, not in-repo.

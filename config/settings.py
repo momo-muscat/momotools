@@ -49,7 +49,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "top_page",
+    "app.top_page",
 ]
 
 MIDDLEWARE = [
@@ -75,6 +75,14 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
             ],
+        },
+    },
+    {
+        "BACKEND": "django.template.backends.jinja2.Jinja2",
+        "DIRS": [BASE_DIR / "jinja2"],
+        "APP_DIRS": False,
+        "OPTIONS": {
+            "environment": "config.jinja2.environment",
         },
     },
 ]

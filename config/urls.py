@@ -20,5 +20,5 @@ from django.urls import include, path
 
 urlpatterns = [
     path("momotools/admin/", admin.site.urls),
-    path("momotools/", include("top_page.urls")),
+    path("momotools/", include("app.top_page.urls")),
 ]
