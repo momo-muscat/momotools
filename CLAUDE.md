@@ -1,45 +1,45 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+このファイルは、このリポジトリでコードを扱う際にClaude Code（claude.ai/code）へガイダンスを提供する。
 
-## Project overview
+## プロジェクト概要
 
-momotools is a personal-use Django project (Django + PostgreSQL, nginx reverse proxy in
-production). It's deployed at `https://jkmomo.net/momotools/` as one of several projects sharing
-that VPS/domain (see "Multi-project hosting" below). Written in Japanese; README.md,
-README_DEPLOY.md, and README_VPS.md contain the full setup/deploy/VPS history in Japanese and are
-the source of truth for anything infrastructure-related not covered here.
+momotoolsは個人利用のDjangoプロジェクト（Django + PostgreSQL、本番はnginxリバースプロキシ）。
+`https://jkmomo.net/momotools/`にデプロイされており、同じVPS/ドメインを共有する複数プロジェクトの
+うちの1つ（後述の「複数プロジェクトのホスティング」を参照）。日本語で書かれている。README.md、
+README_DEPLOY.md、README_VPS.mdに構築・デプロイ・VPSの経緯が日本語で詳しく書かれており、ここに
+記載のないインフラ関連事項についてはそれらが正となる。
 
-Dependencies are managed with `uv` (not pip/poetry directly); the lockfile is `uv.lock`. Dev and
-prod both run directly on the host (WSL2 locally, a systemd service on the VPS) against a
-natively-installed PostgreSQL.
+依存関係は`uv`で管理している（pip/poetryを直接は使わない）。ロックファイルは`uv.lock`。開発・本番
+とも、ネイティブインストールしたPostgreSQLに対してホスト上で直接動く（ローカルはWSL2、本番はVPS上の
+systemdサービス）。
 
-## Commands
+## コマンド
 
 ```bash
-# Run dev server
+# 開発サーバー起動
 uv run python manage.py runserver 0.0.0.0:8000
 
-# Migrations
+# マイグレーション
 uv run python manage.py makemigrations
 uv run python manage.py migrate
 
-# Create an app (apps live under app/, not the project root — see README.md for the full steps,
-# including the apps.py `name` and INSTALLED_APPS/urls.py fixups this requires)
+# アプリ作成（アプリはプロジェクトルート直下ではなくapp/配下に置く構成。手順の詳細
+# （apps.pyのname、INSTALLED_APPS/urls.pyの修正が必要な点を含む）はREADME.md参照）
 uv run python manage.py startapp <app_name> app/<app_name>
 
-# Tests (per-app tests.py, standard Django test runner)
+# テスト（アプリごとのtests.py、標準のDjangoテストランナー）
 uv run python manage.py test
 uv run python manage.py test app.top_page
-uv run python manage.py test app.top_page.tests.SomeTestCase.test_some_method  # single test
+uv run python manage.py test app.top_page.tests.SomeTestCase.test_some_method  # 単一テスト
 
-# Lint / format
+# Lint / フォーマット
 uv run ruff check .
 uv run black --check .
-uv run pre-commit install   # one-time, runs ruff+black on commit
+uv run pre-commit install   # 初回のみ。commit時にruff+blackを自動実行させる
 ```
 
-Production deploy (VPS, via SSH — see README_DEPLOY.md for the full procedure):
+本番デプロイ（VPS、SSH経由 — 完全な手順はREADME_DEPLOY.md参照）:
 
 ```bash
 git pull
@@ -49,48 +49,49 @@ uv run python manage.py collectstatic --noinput
 sudo systemctl restart momotools
 ```
 
-## Architecture
+## アーキテクチャ
 
-- Single Django project `config/` with one app per feature area, all living under `app/`
-  (e.g. `app/top_page/`); currently only `top_page` exists (a placeholder landing page —
-  `TemplateView` rendering `top_page/index.html`, no models yet). `INSTALLED_APPS` and imports use
-  the dotted path `app.top_page`, but the Django app label (used by `manage.py test`, migrations,
-  etc.) stays the last component, `top_page`.
-- **URL mounting is not at root.** `config/urls.py` mounts everything under `/momotools/`
-  (`momotools/admin/` for the admin site, `momotools/` for `app.top_page.urls`). This is deliberate:
-  the VPS hosts multiple unrelated projects under one domain via nginx path-based routing, and this
-  project owns the `/momotools/` path segment. When adding new apps/views, keep them under this
-  project's URL namespace rather than assuming root-mounted routes.
-- Settings (`config/settings.py`) are environment-driven via `django-environ`, reading from `.env`
-  (gitignored; copy from `.env.example`). Key env vars: `DEBUG`, `DJANGO_SECRET_KEY`,
-  `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS`, `DATABASE_URL`. `LANGUAGE_CODE` is `ja`,
-  `TIME_ZONE` is `Asia/Tokyo`.
-- **Database auth differs between local and prod on purpose.** Locally, PostgreSQL is reached over
-  a Unix socket with peer authentication — the Postgres role name must match your OS username (e.g.
-  `postgres://momo@//var/run/postgresql/momotools`), so there's no local password to manage. In
-  production, it's TCP + password (`postgres://user:pass@127.0.0.1:5432/dbname`) since the app runs
-  under a fixed service user (`ubuntu`) via systemd. `POSTGRES_DB`/`POSTGRES_USER`/
-  `POSTGRES_PASSWORD` in `.env` are only consumed by `scripts/backup_db.sh` on the VPS (TCP auth for
-  `pg_dump`), not by Django itself.
-- `SECURE_PROXY_SSL_HEADER` is set because nginx terminates TLS and proxies to Django over plain
-  HTTP — Django trusts `X-Forwarded-Proto` to detect HTTPS. Don't remove this without also
-  reconsidering the nginx config.
-- In production, gunicorn (`config.wsgi:application`) runs as a systemd service (`momotools.service`)
-  bound to `127.0.0.1:8000`; nginx is the only thing that talks to it. Locally, `manage.py runserver`
-  is used directly — there's no process manager needed for dev.
-- Templates use Tailwind via CDN script tag (no build pipeline) — see
-  `app/top_page/templates/top_page/index.html` for the current pattern. A parallel Jinja2 backend
-  is also configured (`config/jinja2.py`), rooted at the project-level `jinja2/` directory (not
-  per-app) since there's only one app so far — see README.md for details.
-- `scripts/backup_db.sh` does daily PostgreSQL backups via a direct `pg_dump` against the native
-  Postgres instance (TCP, credentials from `.env`), rotating old dumps into `~/momo/backup/old/`
-  with 90-day retention; registered via cron on the VPS, not in-repo.
+- 単一のDjangoプロジェクト`config/`があり、機能領域ごとに1アプリを`app/`配下にまとめている
+  （例: `app/top_page/`）。現状は`top_page`のみ存在（プレースホルダーのランディングページ —
+  `top_page/index.html`をレンダリングする`TemplateView`のみで、モデルはまだ無い）。
+  `INSTALLED_APPS`やimportではドット区切りのパス`app.top_page`を使うが、Djangoのアプリラベル
+  （`manage.py test`やマイグレーション等で使われるもの）は最後の要素である`top_page`のまま。
+- **URLはルートにマウントされていない。** `config/urls.py`はすべてを`/momotools/`配下にマウント
+  している（管理サイトは`momotools/admin/`、`app.top_page.urls`は`momotools/`）。これは意図的な
+  構成で、VPSはnginxのパスベースルーティングによって同一ドメイン上で複数の無関係なプロジェクトを
+  ホストしているため、本プロジェクトは`/momotools/`というパスセグメントを占有している。新規に
+  アプリ／ビューを追加する際は、ルートマウントされたルートを前提にせず、このプロジェクトのURL
+  名前空間の配下に置くこと。
+- 設定（`config/settings.py`）は`django-environ`経由で`.env`（gitignore対象。`.env.example`から
+  コピーする）から読み込む環境駆動の構成。主な環境変数: `DEBUG`、`DJANGO_SECRET_KEY`、
+  `DJANGO_ALLOWED_HOSTS`、`DJANGO_CSRF_TRUSTED_ORIGINS`、`DATABASE_URL`。`LANGUAGE_CODE`は`ja`、
+  `TIME_ZONE`は`Asia/Tokyo`。
+- **データベース認証はローカルと本番で意図的に異なる。** ローカルではUnixソケット経由のpeer認証で
+  PostgreSQLに接続する — Postgresのロール名はOSユーザー名と一致させる必要がある（例:
+  `postgres://momo@//var/run/postgresql/momotools`）ため、ローカルで管理すべきパスワードは無い。
+  本番ではTCP＋パスワード認証（`postgres://user:pass@127.0.0.1:5432/dbname`）で、アプリが
+  systemd経由の固定サービスユーザー（`ubuntu`）で動くため。`.env`内の`POSTGRES_DB`/
+  `POSTGRES_USER`/`POSTGRES_PASSWORD`はVPS上の`scripts/backup_db.sh`（`pg_dump`用のTCP認証）
+  のみが使用し、Django自体は使用しない。
+- `SECURE_PROXY_SSL_HEADER`を設定しているのは、nginxがTLSを終端しDjangoへは平文HTTPでプロキシ
+  するため — DjangoはHTTPS判定に`X-Forwarded-Proto`を信頼する。nginx側の設定も合わせて見直す
+  こと無しにこれを外さないこと。
+- 本番ではgunicorn（`config.wsgi:application`）がsystemdサービス（`momotools.service`）として
+  `127.0.0.1:8000`にバインドして動作し、nginxのみがそれと通信する。ローカルでは`manage.py
+  runserver`を直接使用しており、開発用のプロセスマネージャーは不要。
+- テンプレートはCDNの`<script>`タグ経由でTailwindを使用（ビルドパイプライン無し） —
+  現状のパターンは`app/top_page/templates/top_page/index.html`を参照。並行してJinja2バックエンドも
+  設定済み（`config/jinja2.py`）で、現状アプリが1つしかないためアプリ単位ではなくプロジェクト直下の
+  `jinja2/`ディレクトリを起点にしている — 詳細はREADME.md参照。
+- `scripts/backup_db.sh`は、ネイティブのPostgresインスタンスに対して直接`pg_dump`（TCP、
+  認証情報は`.env`から）を実行し毎日PostgreSQLのバックアップを取る。古いダンプは`~/momo/backup/old/`
+  へローテーションし90日間保持する。VPS上でcron登録されており、リポジトリ内では管理していない。
 
-## Multi-project hosting (VPS)
+## 複数プロジェクトのホスティング（VPS）
 
-This app is one of potentially several projects sharing one VPS/nginx/domain. The convention
-(documented in full in README_VPS.md) is: one project = one process (systemd service or static
-dir) on its own internal port bound to `127.0.0.1`, with nginx routing `location /project-name/` to
-it. Each new project gets its own Postgres database (and typically its own role) even if sharing
-the same native Postgres server. Don't assume this project can bind to a public port or own the
-domain root.
+このアプリは、1つのVPS/nginx/ドメインを共有する可能性のある複数プロジェクトのうちの1つ。
+（README_VPS.mdに詳細が記載されている）規約は次の通り: 1プロジェクト＝1プロセス（systemdサービス
+または静的ディレクトリ）が`127.0.0.1`にバインドされた自身専用の内部ポートを持ち、nginxが
+`location /project-name/`をそこへルーティングする。同じネイティブPostgresサーバーを共有していても、
+新規プロジェクトごとに専用のPostgresデータベース（および通常は専用ロール）を持つ。本プロジェクトが
+公開ポートにバインドしたりドメインルートを占有したりできる、と想定しないこと。
