@@ -13,11 +13,6 @@
 1. pre-commit + ruff/black — コード品質チェック
 1. jinja2 — テンプレートエンジン
 
-> **旧構成からの変更点**: 以前はDocker Engine/Docker Compose/Dev Containersを使ってDjango+PostgreSQLを
-> コンテナ化していたが、コンテナのデフォルト実行ユーザーがrootだったことによる所有権の破壊（`git commit`不能）や、
-> Claude Codeのセッション状態がリビルドの度に消えるなど、環境構築の手間が繰り返し問題になったため撤去した。
-> 現在はPython(uv管理の仮想環境)・PostgreSQLとも素のWSL2上にネイティブインストールする構成。
-
 ## Linux環境構築手順
 
 ### 1. WSLのインストール（Windows側、要管理者権限）

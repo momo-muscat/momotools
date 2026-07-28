@@ -10,9 +10,9 @@ that VPS/domain (see "Multi-project hosting" below). Written in Japanese; README
 README_DEPLOY.md, and README_VPS.md contain the full setup/deploy/VPS history in Japanese and are
 the source of truth for anything infrastructure-related not covered here.
 
-Dependencies are managed with `uv` (not pip/poetry directly); the lockfile is `uv.lock`. There is
-no Docker/container layer — dev and prod both run directly on the host (WSL2 locally, a systemd
-service on the VPS) against a natively-installed PostgreSQL.
+Dependencies are managed with `uv` (not pip/poetry directly); the lockfile is `uv.lock`. Dev and
+prod both run directly on the host (WSL2 locally, a systemd service on the VPS) against a
+natively-installed PostgreSQL.
 
 ## Commands
 
