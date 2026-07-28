@@ -72,21 +72,33 @@ TCP＋パスワード認証での接続が必要になる。
     ```
 
 2. `listen_addresses`を全インターフェース待受けに変更する（`/etc/postgresql/18/main/postgresql.conf`）。
+   手動でファイルを編集してもよいし、以下のように`sed`で書き換えてもよい。
 
     ```
     listen_addresses = '*'
+    ```
+
+    ```bash
+    sudo sed -i "s/^#\?listen_addresses = .*/listen_addresses = '*'/" /etc/postgresql/18/main/postgresql.conf
+    grep listen_addresses /etc/postgresql/18/main/postgresql.conf   # '*'になっていることを確認
     ```
 
     デフォルトの`localhost`のままだとループバック(127.0.0.1)以外からの接続を受け付けず、Windows側の
     GUIツールからは`Connection refused`になる。
 
 3. `pg_hba.conf`（`/etc/postgresql/18/main/pg_hba.conf`）にWSL2のサブネットからの接続を許可する行を追加する。
+   手動編集でもよいし、以下のように末尾に追記してもよい。
 
     ```
     host    momotools       momo            172.25.32.0/20          scram-sha-256
     ```
 
-    WSL2のサブネットは`ip addr show eth0`や`hostname -I`で確認できる（環境により異なる）。Windowsから
+    ```bash
+    echo "host    momotools       momo            172.25.32.0/20          scram-sha-256" | sudo tee -a /etc/postgresql/18/main/pg_hba.conf
+    ```
+
+    WSL2のサブネットは`ip addr show eth0`や`hostname -I`で確認できる（環境により異なる。上記の
+    `172.25.32.0/20`は例であり、実際の値に置き換えること）。Windowsから
     TCP接続すると送信元IPは`127.0.0.1`ではなくこのサブネット内のアドレスになるため、`127.0.0.1/32`向けの
     デフォルトルールだけでは通らない。
 
@@ -94,7 +106,11 @@ TCP＋パスワード認証での接続が必要になる。
 
     ```bash
     sudo systemctl restart postgresql@18-main
+    ss -tln | grep 5432   # 0.0.0.0:5432 でLISTENしていればOK（127.0.0.1のみならlisten_addresses未反映）
     ```
+
+    > WindowsのGUIツールを試す前に、WSL2内から`psql "postgresql://momo@127.0.0.1:5432/momotools"`で
+    > TCP＋パスワード接続できるか確認しておくと、パスワード起因の問題とネットワーク起因の問題を切り分けやすい。
 
 5. HeidiSQL（Windows側）の接続設定。
 
@@ -102,8 +118,10 @@ TCP＋パスワード認証での接続が必要になる。
     |---|---|
     | Network type | PostgreSQL (libpq) |
     | Hostname / IP | WSL2のeth0アドレス（`hostname -I`の1つ目の値） |
-    | Port | `.env`の`DATABASE_URL`に合わせる（例: `5433`） |
-    | User | `momo` |
+    | Port | `.env`の`DATABASE_URL`に合わせる（標準構成では`5432`） |
+    | User | `momo`（**要注意**: 新規接続作成時のデフォルト値`postgres`のままだと、`pg_hba.conf`に
+    `postgres`ロール向けの許可行が無いため`no pg_hba.conf entry for host ..., user "postgres"`で
+    接続失敗する。3.で許可したロール名＝`momo`に必ず変更すること） |
     | Password | 手順1で設定したパスワード |
     | Databases | `momotools` |
 
@@ -175,6 +193,9 @@ Jinja2でテンプレートを書く場合は、`DjangoTemplates`の`<app>/templ
 
 ```bash
 uv run python manage.py runserver 0.0.0.0:8000
+uv run python manage.py runserver 127.0.0.1:8000
+uv run python manage.py runserver 8000
+uv run python manage.py runserver
 ```
 
 VS Codeで開発する場合は「WSL」拡張機能でWSL2フォルダを直接開く（Dev Containers不使用）。
@@ -224,6 +245,14 @@ git clone https://github.com/momo-muscat/momotools.git
 cd momotools
 ```
 
+> クローン先の`momotools`ディレクトリが何らかの理由で事前に存在し、かつ所有者がroot等
+> 自ユーザー以外になっている場合、`git clone`が書き込み権限エラーで失敗する。
+> その場合は先に所有権を戻してからクローンする。
+>
+> ```bash
+> sudo chown -R <OSユーザー名>:<OSユーザー名> momotools
+> ```
+
 ### 5. `.env`の作成
 
 `.env`は`.gitignore`対象のためリポジトリに含まれない。`.env.example`をコピーして値を環境に合わせて調整する。
@@ -235,6 +264,11 @@ cp .env.example .env
 
 > `DJANGO_SECRET_KEY`は本番運用する場合、PCごと・環境ごとに固有の値へ変更することを推奨。
 
+> `.env.example`の`DATABASE_URL`は`?port=5433`という例になっているが、これは他の
+> PostgreSQLプロセスとポートが衝突した場合の例であり、通常の単体インストールでは標準の
+> `5432`になる。`psql -d momotools -c '\conninfo'`で実際のポートを確認し、`5432`の場合は
+> `?port=`部分ごと削除してよい。
+
 ### 6. 依存関係のインストールとマイグレーション
 
 上記「Linux環境構築手順」5.と同じ。
@@ -242,6 +276,7 @@ cp .env.example .env
 ```bash
 uv sync
 uv run python manage.py migrate
+uv run python manage.py createsuperuser   # 任意（Django管理画面 /admin/ 用）
 ```
 
 ### 7. （任意）コード品質チェックツールの有効化
@@ -249,3 +284,14 @@ uv run python manage.py migrate
 ```bash
 uv run pre-commit install   # git commit時に自動実行させる場合
 ```
+
+### 8. 起動確認
+
+```bash
+uv run python manage.py runserver 0.0.0.0:8000
+```
+
+ブラウザで`http://127.0.0.1:8000/admin/`にアクセスし、6.で作成した管理ユーザーでログインできれば
+セットアップ完了。WSL2はデフォルトで`localhost`がWindows側からWSL2側へ自動転送されるため、
+Windows側のブラウザからも`127.0.0.1`でアクセスできる。転送が効かない場合は`hostname -I`で
+WSL2のIPアドレスを確認し、`http://<そのIP>:8000/admin/`を試す。
