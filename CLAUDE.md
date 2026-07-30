@@ -24,14 +24,14 @@ uv run python manage.py runserver 0.0.0.0:8000
 uv run python manage.py makemigrations
 uv run python manage.py migrate
 
-# アプリ作成（アプリはプロジェクトルート直下ではなくapp/配下に置く構成。手順の詳細
+# アプリ作成（アプリはプロジェクトルート直下ではなくapps/配下に置く構成。手順の詳細
 # （apps.pyのname、INSTALLED_APPS/urls.pyの修正が必要な点を含む）はREADME.md参照）
-uv run python manage.py startapp <app_name> app/<app_name>
+uv run python manage.py startapp <app_name> apps/<app_name>
 
 # テスト（アプリごとのtests.py、標準のDjangoテストランナー）
 uv run python manage.py test
-uv run python manage.py test app.top_page
-uv run python manage.py test app.top_page.tests.SomeTestCase.test_some_method  # 単一テスト
+uv run python manage.py test apps.top_page
+uv run python manage.py test apps.top_page.tests.SomeTestCase.test_some_method  # 単一テスト
 
 # Lint / フォーマット
 uv run ruff check .
@@ -51,13 +51,13 @@ sudo systemctl restart momotools
 
 ## アーキテクチャ
 
-- 単一のDjangoプロジェクト`config/`があり、機能領域ごとに1アプリを`app/`配下にまとめている
-  （例: `app/top_page/`）。現状は`top_page`のみ存在（プレースホルダーのランディングページ —
+- 単一のDjangoプロジェクト`config/`があり、機能領域ごとに1アプリを`apps/`配下にまとめている
+  （例: `apps/top_page/`）。現状は`top_page`のみ存在（プレースホルダーのランディングページ —
   `top_page/index.html`をレンダリングする`TemplateView`のみで、モデルはまだ無い）。
-  `INSTALLED_APPS`やimportではドット区切りのパス`app.top_page`を使うが、Djangoのアプリラベル
+  `INSTALLED_APPS`やimportではドット区切りのパス`apps.top_page`を使うが、Djangoのアプリラベル
   （`manage.py test`やマイグレーション等で使われるもの）は最後の要素である`top_page`のまま。
 - **URLはルートにマウントされていない。** `config/urls.py`はすべてを`/momotools/`配下にマウント
-  している（管理サイトは`momotools/admin/`、`app.top_page.urls`は`momotools/`）。これは意図的な
+  している（管理サイトは`momotools/admin/`、`apps.top_page.urls`は`momotools/`）。これは意図的な
   構成で、VPSはnginxのパスベースルーティングによって同一ドメイン上で複数の無関係なプロジェクトを
   ホストしているため、本プロジェクトは`/momotools/`というパスセグメントを占有している。新規に
   アプリ／ビューを追加する際は、ルートマウントされたルートを前提にせず、このプロジェクトのURL
@@ -80,8 +80,8 @@ sudo systemctl restart momotools
   `127.0.0.1:8000`にバインドして動作し、nginxのみがそれと通信する。ローカルでは`manage.py
   runserver`を直接使用しており、開発用のプロセスマネージャーは不要。
 - テンプレートはCDNの`<script>`タグ経由でTailwindを使用（ビルドパイプライン無し） —
-  現状のパターンは`app/top_page/templates/top_page/index.html`を参照。並行してJinja2バックエンドも
-  設定済み（`config/jinja2.py`）で、現状アプリが1つしかないためアプリ単位ではなくプロジェクト直下の
+  現状のパターンは`jinja2/top_page/index.html`を参照。テンプレートはJinja2バックエンド
+  （`config/jinja2.py`）で描画しており、現状アプリが1つしかないためアプリ単位ではなくプロジェクト直下の
   `jinja2/`ディレクトリを起点にしている — 詳細はREADME.md参照。
 - `scripts/backup_db.sh`は、ネイティブのPostgresインスタンスに対して直接`pg_dump`（TCP、
   認証情報は`.env`から）を実行し毎日PostgreSQLのバックアップを取る。古いダンプは`~/momo/backup/old/`

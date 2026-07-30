@@ -208,17 +208,17 @@ uv run python manage.py migrate
 
 ### アプリ作成
 
-アプリは`app/`配下にまとめる構成のため、`startapp`をそのまま実行するとルート直下に作られてしまう点に注意。
-`--directory`で出力先を指定し、生成後に`apps.py`の`name`を`app.<app名>`へ修正する。
+アプリは`apps/`配下にまとめる構成のため、`startapp`をそのまま実行するとルート直下に作られてしまう点に注意。
+`--directory`で出力先を指定し、生成後に`apps.py`の`name`を`apps.<app名>`へ修正する。
 
 ```bash
-mkdir -p app/<app名>
-uv run python manage.py startapp <app名> app/<app名>
+mkdir -p apps/<app名>
+uv run python manage.py startapp <app名> apps/<app名>
 ```
 
-生成された`app/<app名>/apps.py`の`name = "<app名>"`を`name = "app.<app名>"`に変更し、
-`config/settings.py`の`INSTALLED_APPS`と`config/urls.py`の`include()`にも`app.<app名>`で追記する
-（`app/top_page`が実例）。
+生成された`apps/<app名>/apps.py`の`name = "<app名>"`を`name = "apps.<app名>"`に変更し、
+`config/settings.py`の`INSTALLED_APPS`と`config/urls.py`の`include()`にも`apps.<app名>`で追記する
+（`apps/top_page`が実例）。
 
 
 # 別PCでの環境構築手順
