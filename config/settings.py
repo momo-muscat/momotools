@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 from pathlib import Path
 
 import environ
+from django.contrib.messages import constants as message_constants
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -50,6 +51,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "apps.top_page",
+    "apps.test_page",
 ]
 
 MIDDLEWARE = [
@@ -63,6 +65,13 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "config.urls"
+
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "top_page:index"
+LOGOUT_REDIRECT_URL = "top_page:index"
+
+# DEBUGモード時のみ、messages.debug()によるデバッグメッセージを表示する
+MESSAGE_LEVEL = message_constants.DEBUG if DEBUG else message_constants.INFO
 
 TEMPLATES = [
     {

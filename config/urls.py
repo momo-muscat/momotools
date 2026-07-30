@@ -16,9 +16,17 @@ Including another URLconf
 """
 
 from django.contrib import admin
+from django.contrib.auth import views as auth_views
 from django.urls import include, path
 
 urlpatterns = [
     path("momotools/admin/", admin.site.urls),
+    path(
+        "momotools/accounts/login/",
+        auth_views.LoginView.as_view(template_name="common/base.html"),
+        name="login",
+    ),
+    path("momotools/accounts/logout/", auth_views.LogoutView.as_view(), name="logout"),
+    path("momotools/test/", include("apps.test_page.urls")),
     path("momotools/", include("apps.top_page.urls")),
 ]
