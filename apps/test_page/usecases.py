@@ -17,7 +17,7 @@ MESSAGE_TEXTS = {
 HELLO_MESSAGE = ""
 
 
-def index(params, app_title):
+def get(params, app_title):
     """テストページの表示処理"""
     return {
         "app_title": app_title,
@@ -26,7 +26,7 @@ def index(params, app_title):
     }
 
 
-def display_message(request, app_title):
+def post(request, app_title):
     """メッセージ表示フォームの送信処理。選択されたメッセージ種別ごとに表示する"""
     form = MessageDisplayForm(request.POST)
     if form.is_valid():

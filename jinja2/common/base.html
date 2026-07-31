@@ -17,8 +17,9 @@
                     <button type="submit" class="underline cursor-pointer">ログアウト</button>
                 </form>
             {% else %}
-                <a href="{{ url('login') }}" class="underline"
-                   onclick="document.getElementById('login-dialog').showModal(); return false;">ログイン</a>
+                <a href="{{ url('login') }}" class="underline" onclick="document.getElementById('login-dialog').showModal(); return false;">
+                    ログイン
+                </a>
             {% endif %}
         </nav>
     </header>
@@ -35,7 +36,7 @@
         <main class="flex-1 flex flex-col items-start">
             {% for message in get_flash_messages(request) %}
                 <div class="flex items-center px-4 py-2 border-b w-full {{ flash_message_color(message.level_tag) }}"
-                     data-auto-hide-seconds="{{ FLASH_MESSAGE_DISPLAY_SECONDS }}">
+                    data-auto-hide-seconds="{{ FLASH_MESSAGE_DISPLAY_SECONDS }}">
                     <span>{{ message }}</span>
                 </div>
                 <script>
@@ -48,7 +49,7 @@
             {% endfor %}
 
             <div class="flex-1 flex flex-col items-start text-left w-full p-6">
-                <h2 class="text-3xl font-bold text-gray-700 mb-4">{{ app_title }}</h2>
+                <h2 class="text-3xl font-bold text-gray-700 mb-4">{{ app_title|default("") }}</h2>
                 {% block content %}{% endblock %}
             </div>
 
@@ -56,8 +57,7 @@
             {% if debug_message %}
                 <div class="border-t w-full {{ debug_message_color() }}">
                     <div class="flex justify-start px-2 pt-1">
-                        <button type="button" class="font-bold px-2 cursor-pointer"
-                                onclick="this.closest('div.border-t').remove()">×</button>
+                        <button type="button" class="font-bold px-2 cursor-pointer" onclick="this.closest('div.border-t').remove()">×</button>
                     </div>
                     <p class="px-4 pb-2">{{ debug_message }}</p>
                 </div>
@@ -75,13 +75,11 @@
             {% endif %}
             <div class="mb-3">
                 <label class="block text-sm mb-1" for="id_username">ユーザー名</label>
-                <input class="border rounded w-full px-2 py-1" type="text" name="username" id="id_username"
-                       required autofocus>
+                <input class="border rounded w-full px-2 py-1" type="text" name="username" id="id_username" required autofocus>
             </div>
             <div class="mb-4">
                 <label class="block text-sm mb-1" for="id_password">パスワード</label>
-                <input class="border rounded w-full px-2 py-1" type="password" name="password" id="id_password"
-                       required>
+                <input class="border rounded w-full px-2 py-1" type="password" name="password" id="id_password" required>
             </div>
             <div class="flex justify-end gap-2">
                 <button type="button" class="px-3 py-1 text-gray-600 cursor-pointer"
@@ -90,7 +88,7 @@
             </div>
         </form>
     </dialog>
-    {% if form is defined and form.errors %}
+    {% if request.resolver_match.url_name == 'login' %}
         <script>
             document.getElementById("login-dialog").showModal();
         </script>

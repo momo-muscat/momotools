@@ -3,18 +3,27 @@
 {% block title %}momoTools{% endblock %}
 
 {% block content %}
-<p class="text-xl font-bold text-gray-800">{{ hello_message }}</p>
+<p class="text-xl font-bold text-gray-800">Hello!</p>
 
-<form method="post" class="flex items-end gap-2 bg-white border rounded p-4 mt-6">
-    {{ csrf_input }}
-    <div>
-        <label class="block text-sm mb-1" for="id_message_type">メッセージ表示テスト</label>
-        <select class="border rounded px-2 py-1" name="message_type" id="id_message_type">
-            {% for value, label in message_form.fields.message_type.choices %}
-                <option value="{{ value }}">{{ label }}</option>
+<div class="mt-6 w-full">
+    <h3 class="text-lg font-bold text-gray-700 mb-2">岡山市の天気</h3>
+    {% if weather_forecast %}
+        <div class="flex gap-4">
+            {% for day in weather_forecast %}
+                <div class="bg-black text-white border border-gray-700 rounded p-4 w-40 text-center">
+                    <p class="text-sm {{ day.date_color_class }}">{{ day.date }}</p>
+                    <p class="text-4xl my-2">{{ day.icon }}</p>
+                    <p class="text-sm text-gray-200">{{ day.description }}</p>
+                    <p class="text-sm mt-1">
+                        <span class="text-pink-400">{{ day.temperature_max }}°</span>
+                        /
+                        <span class="text-blue-400">{{ day.temperature_min }}°</span>
+                    </p>
+                </div>
             {% endfor %}
-        </select>
-    </div>
-    <button type="submit" class="px-3 py-1 bg-gray-700 text-white rounded cursor-pointer">表示</button>
-</form>
+        </div>
+    {% else %}
+        <p class="text-sm text-gray-500">天気情報を取得できませんでした</p>
+    {% endif %}
+</div>
 {% endblock %}

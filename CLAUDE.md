@@ -2,6 +2,10 @@
 
 このファイルは、このリポジトリでコードを扱う際にClaude Code（claude.ai/code）へガイダンスを提供する。
 
+## 応答言語
+
+ユーザーへの応答は常に日本語で行うこと。
+
 ## プロジェクト概要
 
 momotoolsは個人利用のDjangoプロジェクト（Django + PostgreSQL、本番はnginxリバースプロキシ）。
