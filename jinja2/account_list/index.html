@@ -1,0 +1,20 @@
+{% extends "common/base.html" %}
+
+{% block title %}momoTools{% endblock %}
+
+{% block content %}
+<p class="text-xl font-bold text-gray-800">{{ hello_message }}</p>
+
+<form method="post" class="flex items-end gap-2 bg-white border rounded p-4 mt-6">
+    {{ csrf_input }}
+    <div>
+        <label class="block text-sm mb-1" for="id_message_type">メッセージ表示テスト</label>
+        <select class="border rounded px-2 py-1" name="message_type" id="id_message_type">
+            {% for value, label in message_form.fields.message_type.choices %}
+                <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="px-3 py-1 bg-gray-700 text-white rounded cursor-pointer">表示</button>
+</form>
+{% endblock %}
