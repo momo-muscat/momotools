@@ -3,7 +3,7 @@
 {% block title %}momoTools{% endblock %}
 
 {% block content %}
-<p class="text-xl font-bold text-gray-800">{{ hello_message }}</p>
+<p class="text-xl font-bold text-pink-800">{{ hello_message }}</p>
 
 <form method="post" class="flex items-end gap-2 bg-white border rounded p-4 mt-6">
     {{ csrf_input }}
@@ -15,6 +15,6 @@
             {% endfor %}
         </select>
     </div>
-    <button type="submit" class="px-3 py-1 bg-gray-700 text-white rounded cursor-pointer">表示</button>
+    <button type="submit" class="px-3 py-1 bg-pink-700 text-white rounded cursor-pointer">表示</button>
 </form>
 {% endblock %}

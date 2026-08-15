@@ -22,25 +22,25 @@
             {% if search_form.under_contract.value() %}checked{% endif %}>
         <label class="text-sm" for="id_under_contract">{{ search_form.under_contract.label }}</label>
     </div>
-    <button type="submit" class="px-3 py-1 bg-gray-700 text-white rounded cursor-pointer">検索</button>
+    <button type="submit" class="px-3 py-1 bg-pink-700 text-white rounded cursor-pointer">検索</button>
 </form>
 
 <div class="mt-4">
-    <a href="{{ url('account_info:crud') }}" class="px-3 py-1 bg-gray-700 text-white rounded cursor-pointer">新規追加</a>
+    <a href="{{ url('account_info:crud') }}" class="px-3 py-1 bg-pink-700 text-white rounded cursor-pointer">新規追加</a>
 </div>
 
 {% if account_groups is defined %}
 <table class="bg-white border rounded mt-4">
     <tbody>
         {% for group in account_groups %}
-            <tr class="bg-gray-200">
+            <tr class="bg-pink-200">
                 <td colspan="6" class="px-2 py-1 font-bold">{{ group.class_name }}</td>
             </tr>
             {% for account in group.accounts %}
                 <tr class="border-t">
                     <td class="px-2 py-1">
                         <a href="{{ url('account_info:crud') }}?pk={{ account.pk }}"
-                            class="px-2 py-1 bg-gray-700 text-white rounded cursor-pointer text-sm">更新</a>
+                            class="px-2 py-1 bg-pink-700 text-white rounded cursor-pointer text-sm">更新</a>
                     </td>
                     <td class="px-2 py-1 text-center">
                         <input type="checkbox" disabled {% if not account.del_flg %}checked{% endif %}>

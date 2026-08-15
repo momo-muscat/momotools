@@ -7,14 +7,14 @@
     <div class="flex gap-2">
         {% if is_new %}
             <button type="submit" name="action" value="create"
-                    class="px-3 py-1 bg-gray-700 text-white rounded cursor-pointer">追加</button>
+                    class="px-3 py-1 bg-pink-700 text-white rounded cursor-pointer">追加</button>
         {% else %}
             <button type="submit" name="action" value="update"
-                    class="px-3 py-1 bg-gray-700 text-white rounded cursor-pointer">更新</button>
+                    class="px-3 py-1 bg-pink-700 text-white rounded cursor-pointer">更新</button>
             <button type="submit" name="action" value="delete" onclick="return handleAccountDeleteClick(event)"
                     class="px-3 py-1 bg-red-700 text-white rounded cursor-pointer">削除</button>
         {% endif %}
-        <a href="{{ url('account_info:index') }}" class="px-3 py-1 bg-white border rounded text-gray-600 cursor-pointer">戻る</a>
+        <a href="{{ url('account_info:index') }}" class="px-3 py-1 bg-white border rounded text-pink-700 cursor-pointer">戻る</a>
     </div>
 {% endmacro %}
 <form method="post" class="mt-6 max-w-xl w-full">
