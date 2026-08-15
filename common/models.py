@@ -62,14 +62,14 @@ class AccountList(models.Model):
         db_default="ログインURL",
     )
     user_id = models.CharField(
-        max_length=20,
+        max_length=100,
         verbose_name="ユーザID",
         db_comment="ユーザID",
         default="ユーザID",
         db_default="ユーザID",
     )
     password = models.CharField(
-        max_length=50,
+        max_length=100,
         verbose_name="パスワード",
         db_comment="パスワード",
         default="パスワード",
@@ -79,7 +79,7 @@ class AccountList(models.Model):
         verbose_name="削除フラグ", db_comment="削除フラグ", default=False, db_default=False
     )
     member_id = models.CharField(
-        max_length=20,
+        max_length=100,
         blank=True,
         verbose_name="会員ID",
         db_comment="会員ID",
@@ -87,7 +87,7 @@ class AccountList(models.Model):
         db_default="",
     )
     status1 = models.CharField(
-        max_length=10,
+        max_length=50,
         blank=True,
         verbose_name="ステータス1",
         db_comment="ステータス1",
@@ -95,7 +95,7 @@ class AccountList(models.Model):
         db_default="",
     )
     status2 = models.CharField(
-        max_length=10,
+        max_length=50,
         blank=True,
         verbose_name="ステータス2",
         db_comment="ステータス2",
