@@ -3,13 +3,15 @@
 from itertools import groupby
 
 from django.contrib import messages
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, resolve_url
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from common.models import AccountList
 
 from .forms import AccountForm, AccountSearchForm
 
 NOT_FOUND_MESSAGE = "対象のアカウントが見つかりませんでした（既に削除された可能性があります）"
+INDEX_URL = "account_info:index"
 
 
 def get(params, app_title):
@@ -49,9 +51,18 @@ def _search(search_form):
     return groups
 
 
-def crud_get(params, app_title):
+def _safe_next_url(request, next_url):
+    """遷移元へ安全に戻れる場合のみnext_urlを返す（外部サイトへのリダイレクトを防ぐ）"""
+    if next_url and url_has_allowed_host_and_scheme(
+        url=next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return next_url
+    return None
+
+
+def crud_get(request, app_title):
     """アカウントの新規追加・詳細画面の表示処理"""
-    pk = params.get("pk")
+    pk = request.GET.get("pk")
     if pk:
         account = get_object_or_404(AccountList, pk=pk)
         account_form = AccountForm(instance=account)
@@ -65,26 +76,30 @@ def crud_get(params, app_title):
         "account_form": account_form,
         "is_new": is_new,
         "pk": pk,
+        # 検索結果画面から遷移してきた場合、そのURLを保持して「戻る」で復元する
+        "next_url": _safe_next_url(request, request.GET.get("next")),
     }
 
 
 def crud_post(request, app_title):
     """アカウントの新規追加・更新・削除処理
 
-    バリデーションエラー時は再表示用のコンテキストを返す。それ以外（成功・対象なしエラー）は
-    Noneを返し、呼び出し元で一覧へリダイレクトする。
+    バリデーションエラー時は再表示用のコンテキスト（dict）を返す。
+    それ以外（成功・対象なしエラー）はリダイレクト先URL（str）を返す。
     """
     pk = request.POST.get("pk")
     action = request.POST.get("action")
+    safe_next_url = _safe_next_url(request, request.POST.get("next"))
+    redirect_url = safe_next_url or resolve_url(INDEX_URL)
 
     if action == "delete":
         try:
             account = AccountList.objects.get(pk=pk)
         except AccountList.DoesNotExist:
             messages.error(request, NOT_FOUND_MESSAGE)
-            return None
+            return redirect_url
         account.delete()
-        return None
+        return redirect_url
 
     is_new = not pk
     instance = AccountList()
@@ -93,7 +108,7 @@ def crud_post(request, app_title):
             instance = AccountList.objects.get(pk=pk)
         except AccountList.DoesNotExist:
             messages.error(request, NOT_FOUND_MESSAGE)
-            return None
+            return redirect_url
 
     account_form = AccountForm(request.POST, instance=instance)
     if not account_form.is_valid():
@@ -103,6 +118,7 @@ def crud_post(request, app_title):
             "account_form": account_form,
             "is_new": is_new,
             "pk": pk,
+            "next_url": safe_next_url,
         }
     account_form.save()
-    return None
+    return redirect_url

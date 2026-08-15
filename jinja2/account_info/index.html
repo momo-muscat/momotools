@@ -26,7 +26,8 @@
 </form>
 
 <div class="mt-4">
-    <a href="{{ url('account_info:crud') }}" class="px-3 py-1 bg-pink-700 text-white rounded cursor-pointer">新規追加</a>
+    <a href="{{ url('account_info:crud') }}?next={{ request.get_full_path()|urlencode }}"
+       class="px-3 py-1 bg-pink-700 text-white rounded cursor-pointer">新規追加</a>
 </div>
 
 {% if account_groups is defined %}
@@ -39,7 +40,7 @@
             {% for account in group.accounts %}
                 <tr class="border-t">
                     <td class="px-2 py-1">
-                        <a href="{{ url('account_info:crud') }}?pk={{ account.pk }}"
+                        <a href="{{ url('account_info:crud') }}?pk={{ account.pk }}&next={{ request.get_full_path()|urlencode }}"
                             class="px-2 py-1 bg-pink-700 text-white rounded cursor-pointer text-sm">更新</a>
                     </td>
                     <td class="px-2 py-1 text-center">

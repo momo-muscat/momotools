@@ -14,13 +14,16 @@
             <button type="submit" name="action" value="delete" onclick="return handleAccountDeleteClick(event)"
                     class="px-3 py-1 bg-red-700 text-white rounded cursor-pointer">削除</button>
         {% endif %}
-        <a href="{{ url('account_info:index') }}" class="px-3 py-1 bg-white border rounded text-pink-700 cursor-pointer">戻る</a>
+        <a href="{{ next_url or url('account_info:index') }}" class="px-3 py-1 bg-white border rounded text-pink-700 cursor-pointer">戻る</a>
     </div>
 {% endmacro %}
 <form method="post" class="mt-6 max-w-xl w-full">
     {{ csrf_input }}
     {% if not is_new %}
         <input type="hidden" name="pk" value="{{ pk }}">
+    {% endif %}
+    {% if next_url %}
+        <input type="hidden" name="next" value="{{ next_url }}">
     {% endif %}
     <div class="mb-4">
         {{ action_buttons() }}

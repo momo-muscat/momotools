@@ -22,13 +22,13 @@ class AccountCrudView(View):
     app_title = "アカウント情報"
 
     def get(self, request, *args, **kwargs):
-        context = usecases.crud_get(request.GET, app_title=self.app_title)
+        context = usecases.crud_get(request, app_title=self.app_title)
         return render(request, self.template_name, context)
 
     def post(self, request, *args, **kwargs):
-        context = usecases.crud_post(request, app_title=self.app_title)
-        if context is not None:
+        result = usecases.crud_post(request, app_title=self.app_title)
+        if isinstance(result, dict):
             # バリデーションエラー時は入力内容を保持したまま同じ画面を再表示する
-            return render(request, self.template_name, context)
-        # 成功時・対象なしエラー時はPost/Redirect/Getパターンで一覧へ戻す
-        return redirect("account_info:index")
+            return render(request, self.template_name, result)
+        # 成功時・対象なしエラー時はPost/Redirect/Getパターンで遷移元（検索結果）か一覧へ戻す
+        return redirect(result)
