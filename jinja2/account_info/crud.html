@@ -1,0 +1,61 @@
+{% extends "common/base.html" %}
+
+{% block title %}momoTools{% endblock %}
+
+{% block content %}
+{% macro action_buttons() %}
+    <div class="flex gap-2">
+        {% if is_new %}
+            <button type="submit" name="action" value="create"
+                    class="px-3 py-1 bg-gray-700 text-white rounded cursor-pointer">追加</button>
+        {% else %}
+            <button type="submit" name="action" value="update"
+                    class="px-3 py-1 bg-gray-700 text-white rounded cursor-pointer">更新</button>
+            <button type="submit" name="action" value="delete" onclick="return handleAccountDeleteClick(event)"
+                    class="px-3 py-1 bg-red-700 text-white rounded cursor-pointer">削除</button>
+        {% endif %}
+        <a href="{{ url('account_info:index') }}" class="px-3 py-1 bg-white border rounded text-gray-600 cursor-pointer">戻る</a>
+    </div>
+{% endmacro %}
+<form method="post" class="mt-6 max-w-xl w-full">
+    {{ csrf_input }}
+    {% if not is_new %}
+        <input type="hidden" name="pk" value="{{ pk }}">
+    {% endif %}
+    <div class="mb-4">
+        {{ action_buttons() }}
+    </div>
+    <div class="bg-white border rounded p-4">
+        {% for field in account_form %}
+            <div class="mb-3">
+                <label class="block text-sm mb-1" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {% if field.name == "under_contract" %}
+                    {{ field.as_widget(attrs={"class": "border rounded"}) }}
+                {% else %}
+                    {{ field.as_widget(attrs={"class": "border rounded px-2 py-1 w-full"}) }}
+                {% endif %}
+                {% if field.errors %}
+                    <p class="text-red-600 text-sm mt-1">{{ field.errors|join(', ') }}</p>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+    <div class="mt-4">
+        {{ action_buttons() }}
+    </div>
+</form>
+<script>
+    function handleAccountDeleteClick(event) {
+        const button = event.currentTarget;
+        showCommonModal({
+            message: "削除してよろしいですか？",
+            level: "warning",
+            buttons: "confirm_cancel",
+            confirmLabel: "削除",
+            cancelLabel: "キャンセル",
+            onConfirm: () => button.form.requestSubmit(button),
+        });
+        return false;
+    }
+</script>
+{% endblock %}

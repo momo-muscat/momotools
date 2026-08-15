@@ -1,0 +1,58 @@
+{% extends "common/base.html" %}
+
+{% block title %}momoTools{% endblock %}
+
+{% block content %}
+<form method="get" class="flex items-end gap-2 bg-white border rounded p-4 mt-6">
+    <div>
+        <label class="block text-sm mb-1" for="id_account_class">{{ search_form.account_class.label }}</label>
+        <select class="border rounded px-2 py-1" name="account_class" id="id_account_class">
+            {% for value, label in search_form.fields.account_class.choices %}
+                <option value="{{ value }}" {% if search_form.account_class.value()|string == value|string %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div>
+        <label class="block text-sm mb-1" for="id_account_name">{{ search_form.account_name.label }}</label>
+        <input class="border rounded px-2 py-1 placeholder:opacity-40" type="text" name="account_name" id="id_account_name"
+            placeholder="🔍" value="{{ search_form.account_name.value()|default('', true) }}">
+    </div>
+    <div class="flex items-center gap-2 pb-2">
+        <input class="border rounded" type="checkbox" name="under_contract" id="id_under_contract"
+            {% if search_form.under_contract.value() %}checked{% endif %}>
+        <label class="text-sm" for="id_under_contract">{{ search_form.under_contract.label }}</label>
+    </div>
+    <button type="submit" class="px-3 py-1 bg-gray-700 text-white rounded cursor-pointer">検索</button>
+</form>
+
+<div class="mt-4">
+    <a href="{{ url('account_info:crud') }}" class="px-3 py-1 bg-gray-700 text-white rounded cursor-pointer">新規追加</a>
+</div>
+
+{% if account_groups is defined %}
+<table class="bg-white border rounded mt-4">
+    <tbody>
+        {% for group in account_groups %}
+            <tr class="bg-gray-200">
+                <td colspan="6" class="px-2 py-1 font-bold">{{ group.class_name }}</td>
+            </tr>
+            {% for account in group.accounts %}
+                <tr class="border-t">
+                    <td class="px-2 py-1">
+                        <a href="{{ url('account_info:crud') }}?pk={{ account.pk }}"
+                            class="px-2 py-1 bg-gray-700 text-white rounded cursor-pointer text-sm">更新</a>
+                    </td>
+                    <td class="px-2 py-1 text-center">
+                        <input type="checkbox" disabled {% if not account.del_flg %}checked{% endif %}>
+                    </td>
+                    <td class="px-2 py-1">{{ account.name }}</td>
+                    <td class="px-2 py-1">{{ account.user_id }}</td>
+                    <td class="px-2 py-1">{{ account.password }}</td>
+                    <td class="px-2 py-1">{{ account.memo }}</td>
+                </tr>
+            {% endfor %}
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

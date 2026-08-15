@@ -28,6 +28,6 @@ urlpatterns = [
     ),
     path("momotools/accounts/logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("momotools/test/", include("apps.test_page.urls")),
-    path("momotools/account-list/", include("apps.account_list.urls")),
+    path("momotools/account-info/", include("apps.account_info.urls")),
     path("momotools/", include("apps.top_page.urls")),
 ]
