@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "apps.top_page",
     "apps.test_page",
     "apps.account_list",
+    "common",
 ]
 
 MIDDLEWARE = [
