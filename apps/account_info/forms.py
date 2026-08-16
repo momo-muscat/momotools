@@ -4,9 +4,23 @@ from common.models import AccountClass, AccountList
 
 
 class AccountSearchForm(forms.Form):
+    CONTRACT_STATUS_ALL = "all"
+    CONTRACT_STATUS_ACTIVE = "active"
+    CONTRACT_STATUS_CANCELLED = "cancelled"
+    CONTRACT_STATUS_CHOICES = [
+        (CONTRACT_STATUS_ALL, "すべて"),
+        (CONTRACT_STATUS_ACTIVE, "契約中"),
+        (CONTRACT_STATUS_CANCELLED, "解約"),
+    ]
+
     account_class = forms.ChoiceField(label="区分", required=False, initial="")
     account_name = forms.CharField(label="アカウント名", required=False)
-    under_contract = forms.BooleanField(label="契約中", required=False, initial=True)
+    under_contract = forms.ChoiceField(
+        label="契約状態",
+        required=False,
+        choices=CONTRACT_STATUS_CHOICES,
+        initial=CONTRACT_STATUS_ACTIVE,
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -3,6 +3,8 @@
 from itertools import groupby
 
 from django.contrib import messages
+from django.core.exceptions import ValidationError
+from django.core.validators import URLValidator
 from django.shortcuts import get_object_or_404, resolve_url
 from django.utils.http import url_has_allowed_host_and_scheme
 
@@ -12,6 +14,16 @@ from .forms import AccountForm, AccountSearchForm
 
 NOT_FOUND_MESSAGE = "対象のアカウントが見つかりませんでした（既に削除された可能性があります）"
 INDEX_URL = "account_info:index"
+_validate_url = URLValidator()
+
+
+def _is_url(value):
+    """文字列がURLとして妥当かどうかを判定する"""
+    try:
+        _validate_url(value)
+    except ValidationError:
+        return False
+    return True
 
 
 def get(params, app_title):
@@ -33,20 +45,22 @@ def _search(search_form):
     if search_form.is_valid():
         account_class = search_form.cleaned_data["account_class"]
         account_name = search_form.cleaned_data["account_name"]
-        under_contract = search_form.cleaned_data["under_contract"]
+        contract_status = search_form.cleaned_data["under_contract"]
         if account_class:
             queryset = queryset.filter(class_id=account_class)
         if account_name:
             queryset = queryset.filter(name__icontains=account_name)
-        # 契約中＝True は del_flg＝False のアカウントを指す
-        if under_contract:
+        # 契約中＝del_flg=False、解約＝del_flg=True のアカウントを指す
+        if contract_status == AccountSearchForm.CONTRACT_STATUS_ACTIVE:
             queryset = queryset.filter(del_flg=False)
-        else:
+        elif contract_status == AccountSearchForm.CONTRACT_STATUS_CANCELLED:
             queryset = queryset.filter(del_flg=True)
 
     groups = []
     for _, rows in groupby(queryset, key=lambda account: account.class_id):
         rows = list(rows)
+        for account in rows:
+            account.login_url_is_url = _is_url(account.login_url)
         groups.append({"class_name": rows[0].class_name, "accounts": rows})
     return groups
 

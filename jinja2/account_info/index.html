@@ -17,10 +17,13 @@
         <input class="border rounded px-2 py-1 placeholder:opacity-40" type="text" name="account_name" id="id_account_name"
             placeholder="🔍" value="{{ search_form.account_name.value()|default('', true) }}">
     </div>
-    <div class="flex items-center gap-2 pb-2">
-        <input class="border rounded" type="checkbox" name="under_contract" id="id_under_contract"
-            {% if search_form.under_contract.value() %}checked{% endif %}>
-        <label class="text-sm" for="id_under_contract">{{ search_form.under_contract.label }}</label>
+    <div>
+        <label class="block text-sm mb-1" for="id_under_contract">{{ search_form.under_contract.label }}</label>
+        <select class="border rounded px-2 py-1" name="under_contract" id="id_under_contract">
+            {% for value, label in search_form.fields.under_contract.choices %}
+                <option value="{{ value }}" {% if search_form.under_contract.value()|string == value|string %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
     </div>
     <button type="submit" class="px-3 py-1 bg-pink-700 text-white rounded cursor-pointer">検索</button>
 </form>
@@ -35,20 +38,26 @@
     <tbody>
         {% for group in account_groups %}
             <tr class="bg-pink-200">
-                <td colspan="6" class="px-2 py-1 font-bold">{{ group.class_name }}</td>
+                <td colspan="7" class="px-2 py-1 font-bold">{{ group.class_name }}</td>
             </tr>
             {% for account in group.accounts %}
-                <tr class="border-t">
+                <tr class="border-t {% if account.del_flg %}bg-gray-200{% endif %}">
                     <td class="px-2 py-1">
                         <a href="{{ url('account_info:crud') }}?pk={{ account.pk }}&next={{ request.get_full_path()|urlencode }}"
                             class="px-2 py-1 bg-pink-700 text-white rounded cursor-pointer text-sm">更新</a>
                     </td>
-                    <td class="px-2 py-1 text-center">
-                        <input type="checkbox" disabled {% if not account.del_flg %}checked{% endif %}>
-                    </td>
                     <td class="px-2 py-1">{{ account.name }}</td>
+                    <td class="px-2 py-1">
+                        {% if account.login_url_is_url %}
+                            <a href="{{ account.login_url }}" target="_blank" rel="noopener noreferrer"
+                                class="text-pink-700 underline">URL</a>
+                        {% else %}
+                            {{ account.login_url }}
+                        {% endif %}
+                    </td>
                     <td class="px-2 py-1">{{ account.user_id }}</td>
                     <td class="px-2 py-1">{{ account.password }}</td>
+                    <td class="px-2 py-1">{{ account.member_id }}</td>
                     <td class="px-2 py-1 whitespace-pre-line">{{ account.memo }}</td>
                 </tr>
             {% endfor %}
