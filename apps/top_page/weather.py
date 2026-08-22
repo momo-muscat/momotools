@@ -13,10 +13,7 @@ LATITUDE = 34.6551
 LONGITUDE = 133.9195
 
 FORECAST_API_URL = (
-    "https://api.open-meteo.com/v1/forecast"
-    f"?latitude={LATITUDE}&longitude={LONGITUDE}"
-    "&daily=weather_code,temperature_2m_max,temperature_2m_min"
-    "&timezone=Asia%2FTokyo&forecast_days=3"
+    "https://api.open-meteo.com/v1/forecast" f"?latitude={LATITUDE}&longitude={LONGITUDE}" "&daily=weather_code,temperature_2m_max,temperature_2m_min" "&timezone=Asia%2FTokyo&forecast_days=3"
 )
 CACHE_KEY = "top_page:weather_forecast:okayama"
 CACHE_TIMEOUT_SECONDS = 30 * 60

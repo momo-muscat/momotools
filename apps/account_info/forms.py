@@ -24,10 +24,7 @@ class AccountSearchForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["account_class"].choices = [("", "すべて")] + [
-            (account_class.code, account_class.name)
-            for account_class in AccountClass.objects.order_by("code")
-        ]
+        self.fields["account_class"].choices = [("", "すべて")] + [(account_class.code, account_class.name) for account_class in AccountClass.objects.order_by("code")]
 
 
 class AccountForm(forms.ModelForm):
@@ -54,14 +51,9 @@ class AccountForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["account_class"].choices = [
-            (account_class.code, account_class.name)
-            for account_class in AccountClass.objects.order_by("code")
-        ]
+        self.fields["account_class"].choices = [(account_class.code, account_class.name) for account_class in AccountClass.objects.order_by("code")]
         # フィールドの並び順を「区分」が先頭に来るよう調整する
-        other_fields = [
-            name for name in self.fields if name not in ("name", "account_class", "under_contract")
-        ]
+        other_fields = [name for name in self.fields if name not in ("name", "account_class", "under_contract")]
         self.order_fields(["name", "account_class", "under_contract", *other_fields])
         if self.instance.pk:
             self.fields["account_class"].initial = self.instance.class_id

@@ -73,9 +73,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="accountlist",
             name="memo",
-            field=models.TextField(
-                blank=True, db_comment="メモ", db_default="", default="", verbose_name="メモ"
-            ),
+            field=models.TextField(blank=True, db_comment="メモ", db_default="", default="", verbose_name="メモ"),
         ),
         migrations.AlterField(
             model_name="accountlist",

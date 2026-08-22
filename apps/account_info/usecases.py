@@ -67,9 +67,7 @@ def _search(search_form):
 
 def _safe_next_url(request, next_url):
     """遷移元へ安全に戻れる場合のみnext_urlを返す（外部サイトへのリダイレクトを防ぐ）"""
-    if next_url and url_has_allowed_host_and_scheme(
-        url=next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
-    ):
+    if next_url and url_has_allowed_host_and_scheme(url=next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
         return next_url
     return None
 

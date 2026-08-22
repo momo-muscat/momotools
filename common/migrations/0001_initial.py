@@ -16,9 +16,7 @@ class Migration(migrations.Migration):
             fields=[
                 (
                     "id",
-                    models.BigAutoField(
-                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
-                    ),
+                    models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID"),
                 ),
                 (
                     "code",
@@ -70,9 +68,7 @@ class Migration(migrations.Migration):
             fields=[
                 (
                     "id",
-                    models.BigAutoField(
-                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
-                    ),
+                    models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID"),
                 ),
                 (
                     "name",
@@ -86,9 +82,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "class_id",
-                    models.IntegerField(
-                        db_comment="区分ID", db_default=0, default=0, verbose_name="区分ID"
-                    ),
+                    models.IntegerField(db_comment="区分ID", db_default=0, default=0, verbose_name="区分ID"),
                 ),
                 (
                     "class_name",
