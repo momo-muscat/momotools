@@ -295,3 +295,198 @@ uv run python manage.py runserver 0.0.0.0:8000
 セットアップ完了。WSL2はデフォルトで`localhost`がWindows側からWSL2側へ自動転送されるため、
 Windows側のブラウザからも`127.0.0.1`でアクセスできる。転送が効かない場合は`hostname -I`で
 WSL2のIPアドレスを確認し、`http://<そのIP>:8000/admin/`を試す。
+
+
+# WSLディストリビューションの丸ごと移行（エクスポート／インポート）
+
+上記「別PCでの環境構築手順」はGitHubのリポジトリのみを移す方法であり、OS側の環境
+（PostgreSQL、uv、各種CLIツール、シェル設定など）は移行先PCで再構築する必要がある。
+
+これに対し、WSLディストリビューションを丸ごとtarにエクスポートして移行先PCへインポートすれば、
+インストール済みパッケージ・DBの実データ・ホームディレクトリを含めた環境全体をそのまま複製できる。
+
+| 方式 | 移るもの | 向いている場面 |
+| --- | --- | --- |
+| リポジトリのクローン（別PCでの環境構築手順） | ソースコードのみ | 移行先のOS環境が既に整っている／クリーンな環境で作り直したい |
+| ディストリビューションのエクスポート／インポート | OS環境まるごと（パッケージ・DBデータ・ホーム含む） | PC入れ替え、環境の完全複製、バックアップ |
+
+> エクスポートしたtarには`.env`やDBの実データ、SSH鍵、シェル履歴などの秘密情報がそのまま含まれる。
+> 受け渡し時の取り扱いに注意し、クラウドストレージ等に平文で置いたままにしない。
+
+### 1. 移行元PCでのエクスポート
+
+対象ディストリビューションを停止してからエクスポートする（稼働中でも実行できるが、
+DBの書き込み中などに実行すると不整合が生じうるため停止を推奨）。
+
+```powershell
+wsl -l -v                       # 対象名とSTATEを確認
+wsl --terminate Ubuntu-26.04    # 停止（またはwsl --shutdownで全停止）
+wsl --export Ubuntu-26.04 D:\WSL\Ubuntu-26.04_20260816.tar
+```
+
+ファイル名に日付を入れておくと世代管理しやすい。エクスポートには数分かかり、
+本プロジェクトの環境では約4.9GBのtarになった。
+
+> 圧縮したい場合は`--format tar.gz`（または`tar.xz`）を付ける。サイズは小さくなるが
+> エクスポート・インポートともに時間が延びる。VHDXのまま持ち出す`--format vhd`もある。
+>
+> ```powershell
+> wsl --export Ubuntu-26.04 D:\WSL\Ubuntu-26.04.tar.gz --format tar.gz
+> ```
+
+### 2. tarファイルの受け渡し
+
+外付けドライブ、ファイル共有、クラウドストレージ等で移行先PCへコピーする。
+容量が大きいため、ネットワーク経由の場合は転送時間を見込んでおくこと。
+
+### 3. 移行先PCでのインポート
+
+事前に移行先PCでWSL自体を有効化しておく（「Linux環境構築手順」1.参照）。
+その上で、インポート先ディレクトリとtarのパスを指定して実行する。
+
+```powershell
+wsl --import Ubuntu-26.04 D:\WSL\Ubuntu-26.04 D:\WSL\Ubuntu-26.04_20260816.tar --version 2
+```
+
+- 第1引数: 新しいディストリビューション名（既存名と重複不可）
+- 第2引数: 実体（`ext4.vhdx`）を置くディレクトリ。**存在しない場合は自動作成される**
+- 第3引数: インポート元のtarのパス
+
+インポート先はtarと同じフォルダを指定しないこと。専用のサブディレクトリを切る
+（例のように`D:\WSL\Ubuntu-26.04`）。
+
+> インポート先ドライブの空き容量に注意。展開後のVHDXはtarより大きくなる
+> （本プロジェクトでは4.9GBのtarに対しVHDXは約5.3GB）。
+
+### 4. インポート後の確認
+
+```powershell
+wsl -l -v                            # 一覧に追加され、VERSIONが2であることを確認
+wsl -d Ubuntu-26.04                  # 起動
+```
+
+ディストリビューション内で以下を確認する。
+
+```bash
+whoami                    # 既定ユーザーがmomoであること（rootならば下記の対処を行う）
+cat /etc/wsl.conf         # systemd有効・既定ユーザー設定の確認
+psql -d momotools -c '\conninfo'   # PostgreSQLのデータが移行できていること
+```
+
+> **既定ユーザーがrootになる場合の対処**
+>
+> `--import`したディストリビューションは、既定ユーザーの情報がtarに含まれていないと
+> rootでログインする状態になる。ディストリビューション内に`/etc/wsl.conf`があり、
+> 以下の記述があればユーザー設定はそのまま引き継がれる（本プロジェクトの環境は該当）。
+>
+> ```ini
+> [boot]
+> systemd=true
+>
+> [user]
+> default=momo
+> ```
+>
+> rootになってしまう場合は、`/etc/wsl.conf`に上記`[user]`セクションを追記して
+> `wsl --terminate Ubuntu-26.04`で再起動するか、Windows側から次を実行する。
+>
+> ```powershell
+> wsl --manage Ubuntu-26.04 --set-default-user momo
+> ```
+
+### 5. 移行後の後始末
+
+動作確認が済んだら、移行元PCの旧ディストリビューションとtarを整理する。
+
+```powershell
+wsl --unregister Ubuntu-26.04   # 登録解除。VHDXごと完全に削除されるため実行前に必ず確認
+```
+
+> `--unregister`は取り消しできない。移行先での動作確認が完全に終わり、
+> エクスポートしたtarをバックアップとして保持していることを確認してから実行する。
+
+インポートに使ったtarは、しばらくバックアップとして残しておくとよい。
+
+
+# WSLディストリビューションの実体（VHDX）の移動
+
+ディストリビューションの実体は`ext4.vhdx`という単一のファイルで、既定では
+Cドライブの`%LOCALAPPDATA%\wsl\{GUID}\`配下に作成される。開発を進めるとこのファイルは
+数GB〜数十GBに膨らむため、Cドライブの容量を圧迫する場合はDドライブ等へ移動する。
+
+### 1. 現在の保存場所を調べる
+
+保存場所はレジストリの`HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss`配下に
+ディストリビューションごとのサブキーとして記録されている。PowerShellで一覧化できる。
+
+```powershell
+Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss' | ForEach-Object {
+  $p = Get-ItemProperty $_.PSPath
+  [PSCustomObject]@{ Name = $p.DistributionName; BasePath = $p.BasePath }
+} | Format-Table -AutoSize
+```
+
+出力例:
+
+```
+Name         BasePath
+----         --------
+Ubuntu       D:\WSL\Ubuntu
+Ubuntu-26.04 D:\WSL\Ubuntu-26.04
+```
+
+### 2. 既存ディストリビューションを移動する
+
+`wsl --manage --move`を使う（WSL 2.x）。**ディストリビューション名・既定ユーザー・
+`/etc/wsl.conf`の設定はすべて維持され**、レジストリのパスも自動で書き換わる。
+エクスポート／インポートし直す必要はない。
+
+```powershell
+wsl --terminate Ubuntu                       # 対象を停止
+wsl --manage Ubuntu --move D:\WSL\Ubuntu     # 移動
+```
+
+移動後は上記1.のコマンドで`BasePath`が変わったことを確認する。
+
+> 移動元フォルダに`shortcut.ico`（約37KB）が残ることがある。`ext4.vhdx`さえ移動できていれば
+> 実害はないので、気になる場合のみ移動元フォルダごと削除してよい。
+> ただし親フォルダ`%LOCALAPPDATA%\wsl`自体は残しておくこと。
+
+### 3. 新規インストール先を指定する
+
+**WSLには既定のインストール先を恒久的に変更する設定項目が存在しない**
+（`.wslconfig`はメモリ・CPU・ネットワーク等のVM設定用で、インストール先の項目は持たない）。
+そのため、Cドライブ以外に入れたい場合は毎回`--location`で明示する。
+
+```powershell
+wsl --install Ubuntu-26.04 --location D:\WSL\Ubuntu-26.04
+```
+
+`--import`の場合は第2引数がそのまま保存先になる（上記「3. 移行先PCでのインポート」参照）。
+
+指定を忘れてCドライブに入れてしまった場合も、上記2.の`--move`で後から移動できる。
+
+### 4. Windows側からディストリビューション内のファイルにアクセスする
+
+エクスプローラーやWindowsのツールからは、UNCパス経由でアクセスする。
+
+```
+\wsl.localhost\Ubuntu-26.04\home\momo\momotools
+```
+
+`\wsl$\Ubuntu-26.04\...`という旧形式も使えるが、`wsl.localhost`が現在の推奨形式。
+ドライブレターに割り当てることもできる。
+
+```powershell
+net use L: \wsl.localhost\Ubuntu-26.04 /persistent:yes
+```
+
+WSL側から現在のディレクトリをエクスプローラーで開く場合は次のとおり。
+
+```bash
+explorer.exe .
+```
+
+> **`ext4.vhdx`を直接操作しないこと。** Windowsのツールでコピー・編集・移動すると
+> ファイルシステムが破損する。ファイル操作は必ず上記のUNCパス経由か、
+> ディストリビューション内から行う。VHDXの移動が必要な場合は上記2.の`--move`を使う。
