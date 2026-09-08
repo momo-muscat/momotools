@@ -41,7 +41,7 @@ def get(params, app_title):
 
 def _search(search_form):
     """検索フォームの入力値でAccountListを絞り込み、区分ごとにグループ化する"""
-    queryset = AccountList.objects.order_by("class_id", "name")
+    queryset = AccountList.objects.order_by("class_id", "sort")
     if search_form.is_valid():
         account_class = search_form.cleaned_data["account_class"]
         account_name = search_form.cleaned_data["account_name"]
