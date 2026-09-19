@@ -60,10 +60,16 @@ psql -d momotools -c '\conninfo'
 > 繋がらない場合は`sudo cat /etc/postgresql/*/main/pg_hba.conf`で確認し、変更したら
 > `sudo systemctl reload postgresql`。
 
-#### HeidiSQLなど、Windows側のGUIツールから接続する場合
+#### HeidiSQL/A5SQLなど、Windows側のGUIツールから接続する場合
 
-Django自体はUnixソケット経由のpeer認証で繋がるが、HeidiSQLはWindows側で動くため、Unixソケットは使えず
-TCP＋パスワード認証での接続が必要になる。
+Django自体はUnixソケット経由のpeer認証で繋がるが、HeidiSQL/A5SQLはWindows側で動くため、Unixソケットは
+使えずTCP＋パスワード認証での接続が必要になる。
+
+**WSL2のネットワークモードは`mirrored`を強く推奨する（本プロジェクトの開発機でも採用済み）。**
+デフォルトの`NAT`モードだとWSL2のIPアドレスがWSL再起動のたびに（サブネット自体を含めて）変わりうるため、
+`pg_hba.conf`の許可設定やGUIツールの接続先IPをそのたびに直す羽目になり、「さっきまで繋がっていたのに
+急にタイムアウトする」といった事象の主な原因になる。`mirrored`モードならWindows側のネットワーク
+インターフェースをそのまま共有するため、常に`127.0.0.1`固定でアクセスでき、この問題自体が起きない。
 
 1. ロールにパスワードを設定する。
 
@@ -71,7 +77,21 @@ TCP＋パスワード認証での接続が必要になる。
     sudo -u postgres psql -c "ALTER ROLE momo WITH PASSWORD 'ここに任意のパスワード';"
     ```
 
-2. `listen_addresses`を全インターフェース待受けに変更する（`/etc/postgresql/18/main/postgresql.conf`）。
+2. Windows側の`%UserProfile%\.wslconfig`（例: `C:\Users\<ユーザー名>\.wslconfig`）に以下を追記する
+   （Windows 11 22H2以降が必要）。ファイルが無ければ新規作成する。
+
+    ```ini
+    [wsl2]
+    networkingMode=mirrored
+    ```
+
+3. 設定を反映するため、Windows側のPowerShell/コマンドプロンプトから`wsl --shutdown`を実行し、
+   WSLを再起動する（今使っているWSLターミナルセッションも切断される点に注意）。
+
+    再起動後、WSL2内で`hostname -I`を実行し、Windows側のLAN IPと同じアドレスが返ってくれば
+    `mirrored`モードが有効になっている。
+
+4. `listen_addresses`を全インターフェース待受けに変更する（`/etc/postgresql/18/main/postgresql.conf`）。
    手動でファイルを編集してもよいし、以下のように`sed`で書き換えてもよい。
 
     ```
@@ -83,51 +103,38 @@ TCP＋パスワード認証での接続が必要になる。
     grep listen_addresses /etc/postgresql/18/main/postgresql.conf   # '*'になっていることを確認
     ```
 
-    デフォルトの`localhost`のままだとループバック(127.0.0.1)以外からの接続を受け付けず、Windows側の
-    GUIツールからは`Connection refused`になる。
-
-3. `pg_hba.conf`（`/etc/postgresql/18/main/pg_hba.conf`）にWSL2のサブネットからの接続を許可する行を追加する。
-   手動編集でもよいし、以下のように末尾に追記してもよい。
-
-    ```
-    host    momotools       momo            172.25.32.0/20          scram-sha-256
-    ```
-
-    ```bash
-    echo "host    momotools       momo            172.25.32.0/20          scram-sha-256" | sudo tee -a /etc/postgresql/18/main/pg_hba.conf
-    ```
-
-    WSL2のサブネットは`ip addr show eth0`や`hostname -I`で確認できる（環境により異なる。上記の
-    `172.25.32.0/20`は例であり、実際の値に置き換えること）。Windowsから
-    TCP接続すると送信元IPは`127.0.0.1`ではなくこのサブネット内のアドレスになるため、`127.0.0.1/32`向けの
-    デフォルトルールだけでは通らない。
-
-4. 設定を反映する。`listen_addresses`の変更は`reload`では反映されないため`restart`が必要。
+    設定を反映する。`listen_addresses`の変更は`reload`では反映されないため`restart`が必要。
 
     ```bash
     sudo systemctl restart postgresql@18-main
     ss -tln | grep 5432   # 0.0.0.0:5432 でLISTENしていればOK（127.0.0.1のみならlisten_addresses未反映）
     ```
 
+    `mirrored`モードでは`127.0.0.1`宛のTCP接続で`pg_hba.conf`のデフォルト行
+    （`host all all 127.0.0.1/32 scram-sha-256`）がそのまま使えるため、`NAT`モード時のような
+    WSL2サブネット向けの追加許可行は不要。
+
     > WindowsのGUIツールを試す前に、WSL2内から`psql "postgresql://momo@127.0.0.1:5432/momotools"`で
     > TCP＋パスワード接続できるか確認しておくと、パスワード起因の問題とネットワーク起因の問題を切り分けやすい。
 
-5. HeidiSQL（Windows側）の接続設定。
+5. HeidiSQL/A5SQL（Windows側）の接続設定。
 
     | 項目 | 値 |
     |---|---|
     | Network type | PostgreSQL (libpq) |
-    | Hostname / IP | WSL2のeth0アドレス（`hostname -I`の1つ目の値） |
+    | Hostname / IP | `127.0.0.1`（`mirrored`モードのため固定でよい） |
     | Port | `.env`の`DATABASE_URL`に合わせる（標準構成では`5432`） |
     | User | `momo`（**要注意**: 新規接続作成時のデフォルト値`postgres`のままだと、`pg_hba.conf`に
     `postgres`ロール向けの許可行が無いため`no pg_hba.conf entry for host ..., user "postgres"`で
-    接続失敗する。3.で許可したロール名＝`momo`に必ず変更すること） |
+    接続失敗する。1.で設定したロール名＝`momo`に必ず変更すること） |
     | Password | 手順1で設定したパスワード |
     | Databases | `momotools` |
 
-    > WSL2のIPは再起動のたびに変わりうるため、繋がらなくなったら`hostname -I`で再確認する。毎回確認するのが
-    > 面倒な場合はWindows側の`%UserProfile%\.wslconfig`に`networkingMode=mirrored`を追記して
-    > `wsl --shutdown`後に再起動すると、`127.0.0.1`固定で接続できる（Windows 11 22H2以降）。
+    > 何らかの理由で`mirrored`モードが使えない（Windows 11 22H2未満等）場合は、代わりに`NAT`モードの
+    > WSL2 IP（`hostname -I`の1つ目の値）を使う方法もあるが、WSL再起動のたびにIPが変わりうるため
+    > `pg_hba.conf`に`host momotools momo <WSL2のサブネット> scram-sha-256`のような許可行を追加し、
+    > IPが変わったら都度サブネットを書き直す必要がある。「急にタイムアウトするようになった」ときは
+    > まず`hostname -I`の値が変わっていないか、`pg_hba.conf`の許可サブネットと一致しているかを疑うこと。
 
 ### 4. Djangoプロジェクトの作成（uv管理）
 
